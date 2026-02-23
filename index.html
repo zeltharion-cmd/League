@@ -12,9 +12,9 @@
 <body>
   <main class="shell">
     <header class="hero">
-      <p class="eyebrow">MyPower</p>
+      <p class="eyebrow">League of Legends</p>
       <h1>Karma Kommand Kenter</h1>
-      <p class="subtitle">Locked to feelsbanman#EUW with support-first tracking for vision, utility, and impact.</p>
+      <p class="subtitle">Summoner's Rift command board locked to feelsbanman#EUW with support-first tracking for vision, utility, and lane control.</p>
     </header>
 
     <section class="search-card">
@@ -35,6 +35,8 @@
         <div class="otp-controls">
           <label for="otpSelect">OTP Profile</label>
           <select id="otpSelect"></select>
+          <label for="enemyChampionSelect">Enemy Matchup</label>
+          <select id="enemyChampionSelect"></select>
         </div>
       </div>
       <div class="otp-grid">
@@ -47,6 +49,12 @@
           <div id="otpBuild" class="stack-text">Loading...</div>
           <div id="otpBuildIcons" class="icon-row"></div>
           <button id="otpRunesBtn" type="button" class="rune-btn">Open OTP Runes</button>
+        </article>
+        <article class="mini otp-block">
+          <h4>Best Vs Matchup</h4>
+          <div id="matchupBuild" class="stack-text">Loading...</div>
+          <div id="matchupBuildIcons" class="icon-row"></div>
+          <button id="matchupRunesBtn" type="button" class="rune-btn">Open Matchup Runes</button>
         </article>
         <article class="mini otp-block">
           <h4>Your Karma Setup</h4>
