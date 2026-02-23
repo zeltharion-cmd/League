@@ -2,23 +2,24 @@ const searchFormEl = document.getElementById("searchForm");
 const searchBtnEl = document.getElementById("searchBtn");
 const statusTextEl = document.getElementById("statusText");
 const dashboardEl = document.getElementById("dashboard");
-const otpStatusEl = document.getElementById("otpStatus");
-const otpProfileEl = document.getElementById("otpProfile");
-const otpBuildEl = document.getElementById("otpBuild");
+const matchupStatusEl = document.getElementById("matchupStatus");
+
+const enemySupportSelectEl = document.getElementById("enemySupportSelect");
+const enemyBotSelectEl = document.getElementById("enemyBotSelect");
+const matchupBuildEl = document.getElementById("matchupBuild");
 const yourBuildEl = document.getElementById("yourBuild");
-const otpBuildIconsEl = document.getElementById("otpBuildIcons");
+const matchupBuildIconsEl = document.getElementById("matchupBuildIcons");
 const yourBuildIconsEl = document.getElementById("yourBuildIcons");
-const otpRunesBtnEl = document.getElementById("otpRunesBtn");
+const matchupMetaEl = document.getElementById("matchupMeta");
+const matchupAdviceEl = document.getElementById("matchupAdvice");
+const matchupRunesBtnEl = document.getElementById("matchupRunesBtn");
 const yourRunesBtnEl = document.getElementById("yourRunesBtn");
-const otpAdviceEl = document.getElementById("otpAdvice");
-const otpSelectEl = document.getElementById("otpSelect");
+
 const runesModalEl = document.getElementById("runesModal");
 const closeRunesModalEl = document.getElementById("closeRunesModal");
 const runesTitleEl = document.getElementById("runesTitle");
 const runesBodyEl = document.getElementById("runesBody");
-const benchmarkMetaEl = document.getElementById("benchmarkMeta");
-const benchmarkBuildIconsEl = document.getElementById("benchmarkBuildIcons");
-const deltaBadgesEl = document.getElementById("deltaBadges");
+
 const improvementScoreEl = document.getElementById("improvementScore");
 const focusTargetsEl = document.getElementById("focusTargets");
 const trendChartEl = document.getElementById("trendChart");
@@ -39,16 +40,17 @@ const supportKpMetricEl = document.getElementById("supportKpMetric");
 const supportUtilityMetricEl = document.getElementById("supportUtilityMetric");
 const matchesBodyEl = document.getElementById("matchesBody");
 
-let selectedOtpPuuId = "";
-let otpRunesCache = {};
+let selectedEnemySupportId = 0;
+let selectedEnemyBotId = 0;
+let matchupRunesCache = {};
 let yourRunesCache = {};
 
 function setStatus(message) {
   statusTextEl.textContent = message;
 }
 
-function setOtpStatus(message) {
-  otpStatusEl.textContent = message;
+function setMatchupStatus(message) {
+  matchupStatusEl.textContent = message;
 }
 
 function safeNum(value) {
@@ -97,14 +99,6 @@ function runeSection(title, entries) {
   );
 }
 
-function deltaBadge(label, value, inverse = false, suffix = "") {
-  const numeric = safeNum(value);
-  const positive = inverse ? numeric <= 0 : numeric >= 0;
-  const cls = positive ? "delta-good" : "delta-bad";
-  const sign = numeric > 0 ? "+" : "";
-  return `<span class="delta-badge ${cls}">${label}: ${sign}${numeric.toFixed(1)}${suffix}</span>`;
-}
-
 function renderTrendChart(trend) {
   const rows = Array.isArray(trend) ? [...trend].reverse() : [];
   if (!rows.length) {
@@ -135,9 +129,9 @@ function renderTrendChart(trend) {
 }
 
 function openRunesModal(type) {
-  const isOtp = type === "otp";
-  const runes = isOtp ? otpRunesCache : yourRunesCache;
-  runesTitleEl.textContent = isOtp ? "OTP Rune Page" : "Your Rune Page";
+  const isMatchup = type === "matchup";
+  const runes = isMatchup ? matchupRunesCache : yourRunesCache;
+  runesTitleEl.textContent = isMatchup ? "High Elo Matchup Rune Page" : "Your Rune Page";
   runesBodyEl.innerHTML =
     runeSection("Primary", runes.primary || []) +
     runeSection("Secondary", runes.secondary || []) +
@@ -145,32 +139,22 @@ function openRunesModal(type) {
   runesModalEl.classList.remove("hidden");
 }
 
-function otpLabel(option) {
-  const riotId = option.riotId || "Unknown#?";
-  const rank = `#${safeNum(option.rank)}`;
-  const tier = option.tier || "-";
-  const lp = `${safeNum(option.lp)} LP`;
-  return `${rank} ${riotId} (${tier} ${lp})`;
-}
-
-function renderOtpSelect(data) {
-  const options = Array.isArray(data.otpOptions) ? data.otpOptions : [];
-  if (!options.length) {
-    otpSelectEl.innerHTML = `<option value="">No OTP options</option>`;
-    otpSelectEl.disabled = true;
+function renderChampionSelect(selectEl, options, selected, placeholder) {
+  if (!Array.isArray(options) || !options.length) {
+    selectEl.innerHTML = `<option value="0">No champions</option>`;
+    selectEl.disabled = true;
     return;
   }
-
-  const selected = data.selectedOtpPuuId || selectedOtpPuuId || options[0].puuId;
-  selectedOtpPuuId = selected;
-  otpSelectEl.innerHTML = options
-    .map((option) => {
-      const value = option.puuId || "";
-      const selectedAttr = value === selected ? " selected" : "";
-      return `<option value="${value}"${selectedAttr}>${otpLabel(option)}</option>`;
-    })
-    .join("");
-  otpSelectEl.disabled = false;
+  selectEl.innerHTML =
+    `<option value="0">${placeholder}</option>` +
+    options
+      .map((option) => {
+        const id = safeNum(option.id);
+        const selectedAttr = id === selected ? " selected" : "";
+        return `<option value="${id}"${selectedAttr}>${option.name || `Champion ${id}`}</option>`;
+      })
+      .join("");
+  selectEl.disabled = false;
 }
 
 function renderDashboard(payload) {
@@ -226,127 +210,120 @@ function renderDashboard(payload) {
   dashboardEl.classList.remove("hidden");
 }
 
-function renderOtpComparison(payload) {
-  const data = payload.karmaOtpComparison || {};
-  renderOtpSelect(data);
+function renderHighEloMatchup(payload) {
+  const data = payload.karmaMatchup || {};
+  const options = Array.isArray(data.championOptions) ? data.championOptions : [];
+
+  selectedEnemySupportId = selectedEnemySupportId || safeNum(data.selectedEnemySupportId);
+  selectedEnemyBotId = selectedEnemyBotId || safeNum(data.selectedEnemyBotId);
+
+  renderChampionSelect(enemySupportSelectEl, options, selectedEnemySupportId, "Select enemy support");
+  renderChampionSelect(enemyBotSelectEl, options, selectedEnemyBotId, "Select enemy bot carry");
+
+  const bestBuild = data.bestBuild || {};
+  const bestRunes = data.bestRunes || {};
+  const your = data.you || {};
+  const yourRunes = your.runes || {};
+  const aggregate = data.aggregate || {};
+  const comparison = data.comparison || {};
+  const advice = Array.isArray(data.advice) ? data.advice : [];
 
   if (data.error) {
-    otpProfileEl.innerHTML = line("Status", data.error);
-    otpBuildEl.innerHTML = line("Detail", data.detail || "No detail");
-    otpBuildIconsEl.innerHTML = "";
-    yourBuildEl.innerHTML = line("Your Karma games", "-");
+    matchupBuildEl.innerHTML = line("Status", data.error) + line("Detail", data.detail || "No detail");
+    matchupBuildIconsEl.innerHTML = "";
+    yourBuildEl.innerHTML = line("Your Setup", "Unavailable");
     yourBuildIconsEl.innerHTML = "";
-    otpAdviceEl.innerHTML = "<li>Retry after refresh.</li>";
-    otpRunesCache = {};
-    yourRunesCache = {};
-    setOtpStatus(data.error);
+    matchupMetaEl.innerHTML = line("Filter", "Diamond+") + line("Sample", "0 games");
+    matchupAdviceEl.innerHTML = "<li>Retry after refresh.</li>";
+    setMatchupStatus(data.error);
     return;
   }
 
-  const otp = data.otp || {};
-  const you = data.you || {};
-  const comparison = data.comparison || {};
-  const otpRunes = otp.runes || {};
-  const yourRunes = you.runes || {};
-  const otpCore = Array.isArray(otp.coreItems) ? otp.coreItems.join(" -> ") : "-";
-  const yourCore = Array.isArray(you.coreItems) ? you.coreItems.join(" -> ") : "-";
-  const otpSpells = Array.isArray(otp.summonerSpells) ? otp.summonerSpells.join(" + ") : "-";
-  const yourSpells = Array.isArray(you.summonerSpells) ? you.summonerSpells.join(" + ") : "-";
+  const matchupCore = Array.isArray(bestBuild.coreItems) ? bestBuild.coreItems.join(" -> ") : "-";
+  const matchupSpells = Array.isArray(bestBuild.summonerSpells) ? bestBuild.summonerSpells.join(" + ") : "-";
+  const yourCore = Array.isArray(your.coreItems) ? your.coreItems.join(" -> ") : "-";
+  const yourSpells = Array.isArray(your.summonerSpells) ? your.summonerSpells.join(" + ") : "-";
+  const missingCore = Array.isArray(comparison.missingFromYourCore) ? comparison.missingFromYourCore.join(", ") : "-";
 
-  const otpBuildItems = [
-    ...(Array.isArray(otp.coreItemsDetailed) ? otp.coreItemsDetailed : []),
-    ...(Array.isArray(otp.bootsDetailed) ? otp.bootsDetailed : []),
-    ...(Array.isArray(otp.summonerSpellsDetailed) ? otp.summonerSpellsDetailed : []),
+  matchupBuildEl.innerHTML =
+    line("Enemy Support", data.selectedEnemySupport || "-") +
+    line("Enemy Bot", data.selectedEnemyBot || "-") +
+    line("Sample", `${safeNum(data.sampleMatches)} games (${safeNum(aggregate.winRate).toFixed(1)}% WR)`) +
+    line("Core Build", matchupCore || "-") +
+    line("Boots", bestBuild.boots || "-") +
+    line("Spells", matchupSpells || "-") +
+    line("Keystone", bestRunes.keystone || "-") +
+    line("Primary Tree", bestRunes.primaryStyle || "-") +
+    line("Secondary Tree", bestRunes.secondaryStyle || "-");
+
+  const matchupIcons = [
+    ...(Array.isArray(bestBuild.coreItemsDetailed) ? bestBuild.coreItemsDetailed : []),
+    ...(Array.isArray(bestBuild.bootsDetailed) ? bestBuild.bootsDetailed : []),
+    ...(Array.isArray(bestBuild.summonerSpellsDetailed) ? bestBuild.summonerSpellsDetailed : []),
   ];
-  const yourBuildItems = [
-    ...(Array.isArray(you.coreItemsDetailed) ? you.coreItemsDetailed : []),
-    ...(Array.isArray(you.bootsDetailed) ? you.bootsDetailed : []),
-    ...(Array.isArray(you.summonerSpellsDetailed) ? you.summonerSpellsDetailed : []),
-  ];
-
-  otpProfileEl.innerHTML =
-    line("Riot ID", otp.riotId || "-") +
-    line("Rank", `#${safeNum(otp.rank)} - ${otp.tier || "-"} ${safeNum(otp.lp)} LP`) +
-    line("Karma WR/KDA", `${safeNum(otp.winRate).toFixed(1)}% / ${safeNum(otp.kda).toFixed(2)}`) +
-    line("Games", safeNum(otp.games));
-
-  otpBuildEl.innerHTML =
-    line("Core Build", otpCore || "-") +
-    line("Boots", otp.boots || "-") +
-    line("Spells", otpSpells || "-") +
-    line("Keystone", otpRunes.keystone || "-") +
-    line("Primary Tree", otpRunes.primaryStyle || "-") +
-    line("Secondary Tree", otpRunes.secondaryStyle || "-");
-  otpBuildIconsEl.innerHTML = renderIconRow(otpBuildItems);
+  matchupBuildIconsEl.innerHTML = renderIconRow(matchupIcons);
 
   yourBuildEl.innerHTML =
-    line("Karma Sample", `${safeNum(you.karmaGames)} games (${safeNum(you.karmaWinRate).toFixed(1)}% WR)`) +
+    line("Your Karma Sample", `${safeNum(your.karmaGames)} games (${safeNum(your.karmaWinRate).toFixed(1)}% WR)`) +
     line("Core Build", yourCore || "-") +
-    line("Boots", you.boots || "-") +
+    line("Boots", your.boots || "-") +
     line("Spells", yourSpells || "-") +
     line("Keystone", yourRunes.keystone || "-") +
     line("Primary Tree", yourRunes.primaryStyle || "-") +
-    line("Secondary Tree", yourRunes.secondaryStyle || "-");
-  yourBuildIconsEl.innerHTML = renderIconRow(yourBuildItems);
+    line("Secondary Tree", yourRunes.secondaryStyle || "-") +
+    line("Missing vs High Elo", missingCore || "-");
 
-  otpRunesCache = {
-    primary: [
-      ...(Array.isArray(otpRunes.keystoneDetailed) ? otpRunes.keystoneDetailed : []),
-      ...(Array.isArray(otpRunes.primaryRunesDetailed) ? otpRunes.primaryRunesDetailed : []),
-    ],
-    secondary: Array.isArray(otpRunes.secondaryRunesDetailed) ? otpRunes.secondaryRunesDetailed : [],
-    shards: Array.isArray(otpRunes.statShardsDetailed) ? otpRunes.statShardsDetailed : [],
-  };
-  yourRunesCache = {
-    primary: Array.isArray(yourRunes.keystoneDetailed) ? yourRunes.keystoneDetailed : [],
-    secondary: Array.isArray(yourRunes.secondaryRuneDetailed) ? yourRunes.secondaryRuneDetailed : [],
-    shards: [],
-  };
+  const yourIcons = [
+    ...(Array.isArray(your.coreItemsDetailed) ? your.coreItemsDetailed : []),
+    ...(Array.isArray(your.bootsDetailed) ? your.bootsDetailed : []),
+    ...(Array.isArray(your.summonerSpellsDetailed) ? your.summonerSpellsDetailed : []),
+  ];
+  yourBuildIconsEl.innerHTML = renderIconRow(yourIcons);
 
-  const advice = Array.isArray(comparison.advice) ? comparison.advice : [];
-  otpAdviceEl.innerHTML = advice.length
+  matchupMetaEl.innerHTML =
+    line("Source", `${data.source || "Deeplol"} (${data.region || "KR"})`) +
+    line("Elo Filter", data.eloFilter || "DIAMOND+") +
+    line("Build WR", `${safeNum(bestBuild.winRate).toFixed(1)}% in ${safeNum(bestBuild.games)} games`) +
+    line("Rune WR", `${safeNum(bestRunes.winRate).toFixed(1)}% in ${safeNum(bestRunes.games)} games`) +
+    line("Data Note", data.dataNote || "");
+
+  matchupAdviceEl.innerHTML = advice.length
     ? advice.map((entry) => `<li>${entry}</li>`).join("")
-    : "<li>No specific adjustments needed.</li>";
+    : "<li>No urgent changes detected for this matchup pair.</li>";
 
-  setOtpStatus(`Loaded OTP: ${otp.riotId || "Unknown"} (KR).`);
+  matchupRunesCache = {
+    primary: [
+      ...(Array.isArray(bestRunes.keystoneDetailed) ? bestRunes.keystoneDetailed : []),
+      ...(Array.isArray(bestRunes.primaryRunesDetailed) ? bestRunes.primaryRunesDetailed : []),
+    ],
+    secondary: Array.isArray(bestRunes.secondaryRunesDetailed) ? bestRunes.secondaryRunesDetailed : [],
+    shards: Array.isArray(bestRunes.statShardsDetailed) ? bestRunes.statShardsDetailed : [],
+  };
+
+  yourRunesCache = {
+    primary: [
+      ...(Array.isArray(yourRunes.keystoneDetailed) ? yourRunes.keystoneDetailed : []),
+      ...(Array.isArray(yourRunes.primaryRunesDetailed) ? yourRunes.primaryRunesDetailed : []),
+    ],
+    secondary: Array.isArray(yourRunes.secondaryRunesDetailed) ? yourRunes.secondaryRunesDetailed : [],
+    shards: Array.isArray(yourRunes.statShardsDetailed) ? yourRunes.statShardsDetailed : [],
+  };
+
+  setMatchupStatus(
+    `Loaded Diamond+ matchup model: ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}.`
+  );
 }
 
 function renderKarmaInsights(payload) {
   const insights = payload.karmaInsights || {};
-  const benchmark = payload.karmaOtpComparison?.top5Benchmark || {};
-  const benchmarkAverages = benchmark.averages || {};
-  const benchmarkBuild = benchmark.build || {};
-  const benchmarkRunes = benchmark.runes || {};
-  const deltasTop5 = insights.deltaVsTop5 || {};
-  const deltasTargets = insights.deltaVsTargets || {};
   const lane = insights.lanePhase || {};
   const score = insights.improvementScore || {};
   const matchups = Array.isArray(insights.matchups) ? insights.matchups : [];
   const focus = Array.isArray(score.focusTargets) ? score.focusTargets : [];
 
-  benchmarkMetaEl.innerHTML =
-    line("Top5 Avg WR", `${safeNum(benchmarkAverages.winRate).toFixed(1)}%`) +
-    line("Top5 Avg KDA", safeNum(benchmarkAverages.kda).toFixed(2)) +
-    line("Top5 Keystone", benchmarkRunes.keystone || "-") +
-    line("Top5 Secondary", benchmarkRunes.secondaryStyle || "-");
-
-  const benchmarkIcons = [
-    ...(Array.isArray(benchmarkBuild.coreItemsDetailed) ? benchmarkBuild.coreItemsDetailed : []),
-    ...(Array.isArray(benchmarkBuild.bootsDetailed) ? benchmarkBuild.bootsDetailed : []),
-    ...(Array.isArray(benchmarkBuild.summonerSpellsDetailed) ? benchmarkBuild.summonerSpellsDetailed : []),
-  ];
-  benchmarkBuildIconsEl.innerHTML = renderIconRow(benchmarkIcons);
-
-  deltaBadgesEl.innerHTML =
-    deltaBadge("WR vs Top5", safeNum(deltasTop5.winRate), false, "%") +
-    deltaBadge("KDA vs Top5", safeNum(deltasTop5.kda), false, "") +
-    deltaBadge("KP vs Target", safeNum(deltasTargets.killParticipation), false, "%") +
-    deltaBadge("Deaths vs Target", safeNum(deltasTargets.deathsPerGame), true, "") +
-    deltaBadge("Vision/min vs Target", safeNum(deltasTargets.visionPerMin), false, "");
-
   improvementScoreEl.innerHTML =
     `<div class="score-main">${safeNum(score.score)} <small>${score.grade || "-"}</small></div>` +
-    `<div class="score-sub">Higher score means closer to high-level Karma targets.</div>`;
+    `<div class="score-sub">Closer to high-level support targets means stronger consistency.</div>`;
   focusTargetsEl.innerHTML = focus.length
     ? focus.map((entry) => `<li>${entry}</li>`).join("")
     : "<li>No urgent target gaps detected.</li>";
@@ -383,8 +360,11 @@ function renderKarmaInsights(payload) {
 
 async function fetchStats() {
   const query = new URLSearchParams();
-  if (selectedOtpPuuId) {
-    query.set("otp_puu_id", selectedOtpPuuId);
+  if (selectedEnemySupportId > 0) {
+    query.set("enemy_support_id", String(selectedEnemySupportId));
+  }
+  if (selectedEnemyBotId > 0) {
+    query.set("enemy_bot_id", String(selectedEnemyBotId));
   }
 
   const response = await fetch(`/api/stats?${query.toString()}`, {
@@ -401,7 +381,7 @@ async function fetchStats() {
   if (!response.ok) {
     const reason = payload.error || `Request failed with ${response.status}`;
     const endpoint = payload.endpoint ? ` Endpoint: ${payload.endpoint}.` : "";
-    const detail = payload.detail ? ` ${String(payload.detail).slice(0, 120)}` : "";
+    const detail = payload.detail ? ` ${String(payload.detail).slice(0, 140)}` : "";
     throw new Error(`${reason}${endpoint}${detail}`.trim());
   }
   return payload;
@@ -409,32 +389,46 @@ async function fetchStats() {
 
 async function refreshStats() {
   searchBtnEl.disabled = true;
-  otpSelectEl.disabled = true;
+  enemySupportSelectEl.disabled = true;
+  enemyBotSelectEl.disabled = true;
   setStatus("Loading feelsbanman#EUW stats...");
-  setOtpStatus("Loading KR OTP comparison...");
+  setMatchupStatus("Loading Diamond+ matchup recommendations...");
 
   try {
     const payload = await fetchStats();
+    selectedEnemySupportId = safeNum(payload.karmaMatchup?.selectedEnemySupportId);
+    selectedEnemyBotId = safeNum(payload.karmaMatchup?.selectedEnemyBotId);
+
     renderDashboard(payload);
-    renderOtpComparison(payload);
+    renderHighEloMatchup(payload);
     renderKarmaInsights(payload);
-    setStatus(`Loaded latest 5 EUW matches for feelsbanman#EUW (Karma setup sampled from 30 games).`);
+
+    const support = payload.karmaMatchup?.selectedEnemySupport || "-";
+    const bot = payload.karmaMatchup?.selectedEnemyBot || "-";
+    setStatus(
+      `Loaded latest 5 EUW matches. High-elo matchup model loaded for ${support} + ${bot}.`
+    );
   } catch (error) {
     dashboardEl.classList.add("hidden");
     setStatus(error.message || "Failed to load stats.");
-    setOtpStatus("OTP comparison unavailable.");
+    setMatchupStatus("Matchup model unavailable.");
   } finally {
     searchBtnEl.disabled = false;
   }
 }
 
-otpSelectEl.addEventListener("change", async () => {
-  selectedOtpPuuId = otpSelectEl.value || "";
+enemySupportSelectEl.addEventListener("change", async () => {
+  selectedEnemySupportId = safeNum(enemySupportSelectEl.value);
   await refreshStats();
 });
 
-otpRunesBtnEl.addEventListener("click", () => {
-  openRunesModal("otp");
+enemyBotSelectEl.addEventListener("change", async () => {
+  selectedEnemyBotId = safeNum(enemyBotSelectEl.value);
+  await refreshStats();
+});
+
+matchupRunesBtnEl.addEventListener("click", () => {
+  openRunesModal("matchup");
 });
 
 yourRunesBtnEl.addEventListener("click", () => {
