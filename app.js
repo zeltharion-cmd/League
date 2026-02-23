@@ -406,7 +406,7 @@ async function refreshStats() {
     const support = payload.karmaMatchup?.selectedEnemySupport || "-";
     const bot = payload.karmaMatchup?.selectedEnemyBot || "-";
     setStatus(
-      `Loaded latest 5 EUW matches. High-elo matchup model loaded for ${support} + ${bot}.`
+      `Loaded latest 5 EUW matches. Highest-winrate Diamond+ matchup model loaded for ${support} + ${bot}.`
     );
   } catch (error) {
     dashboardEl.classList.add("hidden");

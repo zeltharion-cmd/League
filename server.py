@@ -552,13 +552,15 @@ def karma_matchup_recommendation_from_deeplol(
         stats: dict[Any, dict[str, float]],
         *,
         sample_count: int,
-        min_games_floor: int = 3,
+        min_games_floor: int = 5,
+        high_winrate_floor: float = 52.0,
     ) -> tuple[Any, float, int]:
         if not stats:
             return None, 0.0, 0
         min_games = max(min_games_floor, int(sample_count * 0.1))
-        eligible = [row for row in stats.items() if safe_num(row[1].get("games")) >= min_games]
-        pool = eligible if eligible else list(stats.items())
+        eligible_min_games = [row for row in stats.items() if safe_num(row[1].get("games")) >= min_games]
+        eligible_high_wr = [row for row in eligible_min_games if setup_win_rate(row[1]) >= high_winrate_floor]
+        pool = eligible_high_wr if eligible_high_wr else (eligible_min_games if eligible_min_games else list(stats.items()))
         pool.sort(
             key=lambda row: (
                 setup_win_rate(row[1]),
@@ -874,7 +876,7 @@ def karma_matchup_recommendation_from_deeplol(
         "source": "deeplol.gg",
         "region": "KR",
         "eloFilter": "DIAMOND+ (closest available to D2+)",
-        "dataNote": data_note,
+        "dataNote": f"{data_note} Build and rune recommendations are selected by highest win rate with sample guard.",
         "champion": "Karma",
         "selectedEnemySupportId": selected_support,
         "selectedEnemyBotId": selected_bot,

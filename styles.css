@@ -27,6 +27,8 @@ body {
 }
 
 body {
+  position: relative;
+  overflow-x: hidden;
   margin: 0;
   font-family: "Manrope", "Segoe UI", sans-serif;
   color: var(--ink);
@@ -42,7 +44,50 @@ body {
   background-attachment: fixed;
 }
 
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  opacity: 0.22;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 28px,
+      rgba(72, 208, 255, 0.24) 28px 29px,
+      transparent 29px 72px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 80px,
+      rgba(200, 164, 97, 0.18) 80px 81px,
+      transparent 81px 150px
+    );
+  animation: matrix-lines-shift 16s linear infinite;
+}
+
+body::after {
+  opacity: 0.2;
+  background:
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(72, 208, 255, 0.28) 20%,
+      transparent 46%,
+      transparent 100%
+    );
+  background-size: 100% 220px;
+  animation: matrix-lines-fall 7s linear infinite;
+}
+
 .shell {
+  position: relative;
+  z-index: 1;
   width: min(1220px, 100%);
   margin: 0 auto;
   padding: 1.1rem;
@@ -137,6 +182,35 @@ body {
   outline: none;
   border-color: rgba(200, 164, 97, 0.72);
   box-shadow: 0 0 0 2px rgba(200, 164, 97, 0.18);
+}
+
+#enemySupportSelect,
+#enemyBotSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border: 1px solid rgba(78, 184, 230, 0.45);
+  background:
+    linear-gradient(180deg, rgba(16, 40, 67, 0.95), rgba(10, 27, 46, 0.96)),
+    linear-gradient(45deg, transparent 50%, #8fcdeb 50%),
+    linear-gradient(135deg, #8fcdeb 50%, transparent 50%);
+  background-repeat: no-repeat;
+  background-size: auto, 8px 8px, 8px 8px;
+  background-position: center, calc(100% - 16px) 52%, calc(100% - 10px) 52%;
+  color: #ebf7ff;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding-right: 2rem;
+}
+
+#enemySupportSelect:hover,
+#enemyBotSelect:hover {
+  border-color: rgba(200, 164, 97, 0.7);
+}
+
+#enemySupportSelect:disabled,
+#enemyBotSelect:disabled {
+  opacity: 0.72;
 }
 
 #searchBtn {
@@ -596,9 +670,34 @@ th {
   display: none !important;
 }
 
+@keyframes matrix-lines-shift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-72px);
+  }
+}
+
+@keyframes matrix-lines-fall {
+  from {
+    background-position: 0 -220px;
+  }
+  to {
+    background-position: 0 220px;
+  }
+}
+
 @media (max-width: 1120px) {
   .support-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after {
+    animation: none;
   }
 }
 
