@@ -20,6 +20,9 @@ LOCKED_TAG_LINE = "EUW"
 KARMA_CHAMPION_ID = 43
 DISPLAY_MATCH_COUNT_FIXED = 5
 KARMA_SETUP_MATCH_COUNT = 30
+MATCHUP_SETUP_MATCH_COUNT = 60
+MATCHUP_PAGE_SIZE = 10
+MATCHUP_PLAYER_TYPE = "all"
 DEEPL0L_API_BASE = "https://b2c-api-cdn.deeplol.gg"
 STATIC_CACHE_SECONDS = 6 * 60 * 60
 DEEPL0L_CACHE_SECONDS = 5 * 60
@@ -41,11 +44,14 @@ STATIC_REF_CACHE: dict[str, Any] = {
     "rune_icons": {},
     "spell_names": {},
     "spell_icons": {},
+    "champion_names": {},
+    "champion_icons": {},
 }
 DEEPL0L_KARMA_CACHE: dict[str, Any] = {
     "fetched_at": 0,
     "otp_rows": [],
     "builds": {},
+    "matchup_rows": {},
 }
 
 # Platform regions (game shard) to regional routing values for Match-v5/Account-v1.
@@ -204,6 +210,8 @@ def get_static_reference_maps() -> tuple[
     dict[int, str],
     dict[int, str],
     dict[int, str],
+    dict[int, str],
+    dict[int, str],
 ]:
     now = int(time.time())
     if (
@@ -220,6 +228,8 @@ def get_static_reference_maps() -> tuple[
             STATIC_REF_CACHE["rune_icons"],
             STATIC_REF_CACHE["spell_names"],
             STATIC_REF_CACHE["spell_icons"],
+            STATIC_REF_CACHE["champion_names"],
+            STATIC_REF_CACHE["champion_icons"],
         )
 
     version_list = http_get_json("https://ddragon.leagueoflegends.com/api/versions.json", "ddragon_versions")
@@ -238,6 +248,10 @@ def get_static_reference_maps() -> tuple[
     spell_data = http_get_json(
         f"https://ddragon.leagueoflegends.com/cdn/{version}/data/en_US/summoner.json",
         "ddragon_spells",
+    )
+    champion_data = http_get_json(
+        f"https://ddragon.leagueoflegends.com/cdn/{version}/data/en_US/champion.json",
+        "ddragon_champions",
     )
 
     item_names: dict[int, str] = {}
@@ -287,6 +301,19 @@ def get_static_reference_maps() -> tuple[
                     f"https://ddragon.leagueoflegends.com/cdn/{version}/img/spell/{image_full}"
                 )
 
+    champion_names: dict[int, str] = {}
+    champion_icons: dict[int, str] = {}
+    for champion in (champion_data.get("data", {}) or {}).values():
+        champion_id = safe_num(champion.get("key"))
+        if champion_id <= 0:
+            continue
+        champion_names[champion_id] = str(champion.get("name", f"Champion {champion_id}"))
+        image_full = str((champion.get("image", {}) or {}).get("full", "")).strip()
+        if image_full:
+            champion_icons[champion_id] = (
+                f"https://ddragon.leagueoflegends.com/cdn/{version}/img/champion/{image_full}"
+            )
+
     STATIC_REF_CACHE["fetched_at"] = now
     STATIC_REF_CACHE["version"] = version
     STATIC_REF_CACHE["item_names"] = item_names
@@ -295,6 +322,8 @@ def get_static_reference_maps() -> tuple[
     STATIC_REF_CACHE["rune_icons"] = rune_icons
     STATIC_REF_CACHE["spell_names"] = spell_names
     STATIC_REF_CACHE["spell_icons"] = spell_icons
+    STATIC_REF_CACHE["champion_names"] = champion_names
+    STATIC_REF_CACHE["champion_icons"] = champion_icons
     return (
         version,
         item_names,
@@ -303,6 +332,8 @@ def get_static_reference_maps() -> tuple[
         rune_icons,
         spell_names,
         spell_icons,
+        champion_names,
+        champion_icons,
     )
 
 
@@ -412,6 +443,498 @@ def get_otp_build_from_deeplol(puu_id: str) -> dict[str, Any]:
         DEEPL0L_KARMA_CACHE["builds"] = {}
     DEEPL0L_KARMA_CACHE["builds"][puu] = best_build
     return best_build
+
+
+def build_champion_options(
+    champion_names: dict[int, str],
+    champion_icons: dict[int, str],
+) -> list[dict[str, Any]]:
+    rows = [
+        {
+            "id": champion_id,
+            "name": champion_name,
+            "icon": champion_icons.get(champion_id, ""),
+        }
+        for champion_id, champion_name in champion_names.items()
+        if champion_id > 0
+    ]
+    rows.sort(key=lambda row: str(row.get("name", "")))
+    return rows
+
+
+def get_matchup_rows_from_deeplol(
+    enemy_champion_id: int,
+    *,
+    pages: int = 3,
+    player_type: str = MATCHUP_PLAYER_TYPE,
+) -> list[dict[str, Any]]:
+    enemy_id = safe_num(enemy_champion_id)
+    if enemy_id <= 0:
+        return []
+
+    page_count = max(1, safe_num(pages))
+    cache_key = f"{enemy_id}|{page_count}|{str(player_type).upper()}"
+    now = int(time.time())
+    cache_map = DEEPL0L_KARMA_CACHE.get("matchup_rows", {})
+    if isinstance(cache_map, dict):
+        cached = cache_map.get(cache_key)
+        if (
+            isinstance(cached, dict)
+            and (now - safe_int_text(cached.get("fetched_at", 0))) < DEEPL0L_CACHE_SECONDS
+            and isinstance(cached.get("rows"), list)
+        ):
+            return cached["rows"][:MATCHUP_SETUP_MATCH_COUNT]
+
+    rows: list[dict[str, Any]] = []
+    for page in range(1, page_count + 1):
+        payload = deeplol_get_json(
+            "matchup/OTP_match",
+            {
+                "champion_id": str(KARMA_CHAMPION_ID),
+                "enemy_champion_id": str(enemy_id),
+                "page": str(page),
+                "player_type": str(player_type),
+            },
+        )
+        page_rows = payload.get("match_up_list", []) if isinstance(payload, dict) else []
+        if not isinstance(page_rows, list) or not page_rows:
+            break
+
+        for row in page_rows:
+            if not isinstance(row, dict):
+                continue
+            row_champion = safe_num(row.get("champion_id"))
+            row_enemy = safe_num(row.get("enemy_champion_id"))
+            if row_champion != KARMA_CHAMPION_ID or row_enemy != enemy_id:
+                continue
+            if str(row.get("position", "")).lower() not in {"supporter", "support"}:
+                continue
+            rows.append(row)
+            if len(rows) >= MATCHUP_SETUP_MATCH_COUNT:
+                break
+
+        if len(page_rows) < MATCHUP_PAGE_SIZE or len(rows) >= MATCHUP_SETUP_MATCH_COUNT:
+            break
+
+    if not isinstance(DEEPL0L_KARMA_CACHE.get("matchup_rows"), dict):
+        DEEPL0L_KARMA_CACHE["matchup_rows"] = {}
+    DEEPL0L_KARMA_CACHE["matchup_rows"][cache_key] = {
+        "fetched_at": now,
+        "rows": rows,
+    }
+    return rows
+
+
+def karma_matchup_recommendation_from_deeplol(
+    *,
+    enemy_support_id: int,
+    enemy_bot_id: int,
+    karma_games: int,
+    karma_wins: int,
+    karma_item_counter: Counter[int],
+    karma_keystone_counter: Counter[int],
+    karma_primary_style_counter: Counter[int],
+    karma_secondary_style_counter: Counter[int],
+    karma_secondary_keystone_counter: Counter[int],
+    karma_spell_counter: Counter[tuple[int, int]],
+    diagnostics: list[dict[str, Any]],
+) -> dict[str, Any]:
+    def is_diamond_plus(tier_name: str) -> bool:
+        tier = str(tier_name or "").upper()
+        return tier in {"DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"}
+
+    def setup_win_rate(stats_row: dict[str, float]) -> float:
+        games = max(safe_num(stats_row.get("games")), 1)
+        wins = safe_num(stats_row.get("wins"))
+        return (wins * 100.0) / games
+
+    def choose_best_setup(
+        stats: dict[Any, dict[str, float]],
+        *,
+        sample_count: int,
+        min_games_floor: int = 3,
+    ) -> tuple[Any, float, int]:
+        if not stats:
+            return None, 0.0, 0
+        min_games = max(min_games_floor, int(sample_count * 0.1))
+        eligible = [row for row in stats.items() if safe_num(row[1].get("games")) >= min_games]
+        pool = eligible if eligible else list(stats.items())
+        pool.sort(
+            key=lambda row: (
+                setup_win_rate(row[1]),
+                safe_num(row[1].get("games")),
+                safe_num(row[1].get("wins")),
+            ),
+            reverse=True,
+        )
+        key, row = pool[0]
+        return key, round(setup_win_rate(row), 1), safe_num(row.get("games"))
+
+    def row_core_items(
+        row: dict[str, Any],
+        *,
+        boot_ids: set[int],
+        trinket_ids: set[int],
+    ) -> list[int]:
+        values: list[int] = []
+        for item_id in (row.get("item_core", []) or []):
+            item_num = safe_num(item_id)
+            if (
+                item_num <= 0
+                or item_num in boot_ids
+                or item_num in trinket_ids
+                or is_support_quest_item(item_num)
+                or item_num == 2055
+            ):
+                continue
+            if item_num not in values:
+                values.append(item_num)
+        for item_id in (row.get("item_final", []) or []):
+            item_num = safe_num(item_id)
+            if (
+                item_num <= 0
+                or item_num in boot_ids
+                or item_num in trinket_ids
+                or is_support_quest_item(item_num)
+                or item_num == 2055
+            ):
+                continue
+            if item_num not in values:
+                values.append(item_num)
+            if len(values) >= 3:
+                break
+        return values[:3]
+
+    try:
+        (
+            ddragon_version,
+            item_names,
+            item_tags,
+            rune_names,
+            rune_icons,
+            spell_names,
+            spell_icons,
+            champion_names,
+            champion_icons,
+        ) = get_static_reference_maps()
+    except Exception as exc:
+        diagnostics.append(
+            {
+                "endpoint": "matchup_static_maps",
+                "status": 0,
+                "detail": str(exc)[:180],
+            }
+        )
+        return {
+            "source": "deeplol.gg",
+            "region": "KR",
+            "error": "Failed to load static matchup data.",
+            "detail": str(exc)[:200],
+            "selectedEnemySupportId": safe_num(enemy_support_id),
+            "selectedEnemyBotId": safe_num(enemy_bot_id),
+            "championOptions": [],
+        }
+
+    champion_options = build_champion_options(champion_names, champion_icons)
+    selected_support = safe_num(enemy_support_id)
+    selected_bot = safe_num(enemy_bot_id)
+    if selected_support <= 0 or selected_support not in champion_names:
+        selected_support = 0
+    if selected_bot <= 0 or selected_bot not in champion_names:
+        selected_bot = 0
+
+    if selected_support <= 0 and selected_bot <= 0:
+        return {
+            "source": "deeplol.gg",
+            "region": "KR",
+            "eloFilter": "DIAMOND+ (closest available to D2+)",
+            "dataNote": "Deeplol matchup feed exposes tier, not exact Diamond division.",
+            "selectedEnemySupportId": 0,
+            "selectedEnemyBotId": 0,
+            "selectedEnemySupport": "Select enemy support",
+            "selectedEnemyBot": "Select enemy bot carry",
+            "championOptions": champion_options,
+            "sampleMatches": 0,
+            "aggregate": {"wins": 0, "losses": 0, "winRate": 0.0},
+            "bestBuild": {},
+            "bestRunes": {},
+            "you": {},
+            "comparison": {},
+            "advice": ["Pick an enemy champion to load a matchup-specific Karma setup."],
+        }
+
+    matchup_rows: list[dict[str, Any]] = []
+    try:
+        page_count = max(1, MATCHUP_SETUP_MATCH_COUNT // MATCHUP_PAGE_SIZE)
+        if selected_support > 0:
+            support_rows = get_matchup_rows_from_deeplol(
+                selected_support,
+                pages=page_count,
+                player_type=MATCHUP_PLAYER_TYPE,
+            )
+            matchup_rows.extend(support_rows)
+        if selected_bot > 0 and selected_bot != selected_support:
+            bot_rows = get_matchup_rows_from_deeplol(
+                selected_bot,
+                pages=page_count,
+                player_type=MATCHUP_PLAYER_TYPE,
+            )
+            matchup_rows.extend(bot_rows)
+    except Exception as exc:
+        diagnostics.append(
+            {
+                "endpoint": "matchup_otp_match",
+                "status": 0,
+                "detail": str(exc)[:180],
+            }
+        )
+        return {
+            "source": "deeplol.gg",
+            "region": "KR",
+            "error": "Failed to load matchup build data.",
+            "detail": str(exc)[:200],
+            "selectedEnemySupportId": selected_support,
+            "selectedEnemyBotId": selected_bot,
+            "selectedEnemySupport": champion_names.get(selected_support, "Unknown"),
+            "selectedEnemyBot": champion_names.get(selected_bot, "Unknown"),
+            "championOptions": champion_options,
+        }
+
+    if not matchup_rows:
+        return {
+            "source": "deeplol.gg",
+            "region": "KR",
+            "eloFilter": "DIAMOND+ (closest available to D2+)",
+            "dataNote": "No matchup rows returned for this pair.",
+            "selectedEnemySupportId": selected_support,
+            "selectedEnemyBotId": selected_bot,
+            "selectedEnemySupport": champion_names.get(selected_support, "Unknown"),
+            "selectedEnemyBot": champion_names.get(selected_bot, "Unknown"),
+            "championOptions": champion_options,
+            "sampleMatches": 0,
+            "aggregate": {"wins": 0, "losses": 0, "winRate": 0.0},
+            "bestBuild": {},
+            "bestRunes": {},
+            "you": {},
+            "comparison": {},
+            "advice": ["No matchup samples found yet for this support + bot pair."],
+        }
+
+    boot_ids = {
+        item_id for item_id, tags in item_tags.items()
+        if isinstance(tags, list) and "Boots" in tags
+    }
+    trinket_ids = {
+        item_id for item_id, tags in item_tags.items()
+        if isinstance(tags, list) and "Trinket" in tags
+    }
+    your_boots = top_ids(karma_item_counter, 1, lambda item_id: item_id in boot_ids)
+    your_core = top_ids(
+        karma_item_counter,
+        3,
+        lambda item_id: (
+            item_id not in boot_ids
+            and item_id not in trinket_ids
+            and not is_support_quest_item(item_id)
+            and item_id != 2055
+        ),
+    )
+    if not your_core:
+        your_core = top_ids(
+            karma_item_counter,
+            3,
+            lambda item_id: item_id not in trinket_ids and item_id not in boot_ids,
+        )
+    your_keystone = top_ids(karma_keystone_counter, 1)[0] if karma_keystone_counter else 0
+    your_primary_style = top_ids(karma_primary_style_counter, 1)[0] if karma_primary_style_counter else 0
+    your_secondary_style = top_ids(karma_secondary_style_counter, 1)[0] if karma_secondary_style_counter else 0
+    your_secondary_rune = top_ids(karma_secondary_keystone_counter, 1)[0] if karma_secondary_keystone_counter else 0
+    spell_pair_values = sorted(karma_spell_counter.items(), key=lambda row: (-row[1], row[0]))
+    your_spell_ids: list[int] = []
+    if spell_pair_values:
+        your_spell_ids = [safe_num(spell_pair_values[0][0][0]), safe_num(spell_pair_values[0][0][1])]
+    your_setup = {
+        "karmaGames": karma_games,
+        "karmaWinRate": round((karma_wins * 100 / karma_games), 1) if karma_games else 0.0,
+        "coreItemIds": your_core,
+        "coreItems": ids_to_names(your_core, item_names, "Item"),
+        "coreItemsDetailed": build_item_details(your_core, item_names, ddragon_version),
+        "bootsId": your_boots[0] if your_boots else 0,
+        "boots": id_name(your_boots[0], item_names, "Item") if your_boots else "-",
+        "bootsDetailed": build_item_details([your_boots[0]], item_names, ddragon_version) if your_boots else [],
+        "summonerSpellIds": your_spell_ids,
+        "summonerSpells": ids_to_names(your_spell_ids, spell_names, "Spell"),
+        "summonerSpellsDetailed": build_spell_details(your_spell_ids, spell_names, spell_icons),
+        "runes": {
+            "primaryStyleId": your_primary_style,
+            "primaryStyle": id_name(your_primary_style, rune_names, "Rune"),
+            "keystoneId": your_keystone,
+            "keystone": id_name(your_keystone, rune_names, "Rune"),
+            "keystoneDetailed": build_rune_details([your_keystone], rune_names, rune_icons),
+            "primaryRunesDetailed": [],
+            "secondaryStyleId": your_secondary_style,
+            "secondaryStyle": id_name(your_secondary_style, rune_names, "Rune"),
+            "secondaryRuneId": your_secondary_rune,
+            "secondaryRune": id_name(your_secondary_rune, rune_names, "Rune"),
+            "secondaryRunesDetailed": build_rune_details([your_secondary_rune], rune_names, rune_icons),
+            "statShardsDetailed": [],
+        },
+    }
+
+    wins = 0
+    high_elo_rows = [row for row in matchup_rows if is_diamond_plus(str(row.get("tier", "")))]
+    rows_for_model = high_elo_rows if high_elo_rows else matchup_rows
+    data_note = (
+        "Using DIAMOND+ rows from Deeplol (closest available to D2+)."
+        if high_elo_rows
+        else "Not enough DIAMOND+ rows; fell back to all available matchup rows."
+    )
+
+    build_stats: dict[tuple[Any, ...], dict[str, float]] = {}
+    rune_stats: dict[tuple[Any, ...], dict[str, float]] = {}
+
+    for row in rows_for_model:
+        win = safe_num(row.get("win")) == 1
+        wins += 1 if win else 0
+        final_items = [safe_num(item_id) for item_id in (row.get("item_final", []) or []) if safe_num(item_id) > 0]
+        matchup_core = row_core_items(row, boot_ids=boot_ids, trinket_ids=trinket_ids)
+        matchup_boots = next((item_id for item_id in final_items if item_id in boot_ids), 0)
+        spell = row.get("spell", {})
+        spell_1 = safe_num((spell or {}).get("spell_1"))
+        spell_2 = safe_num((spell or {}).get("spell_2"))
+        spell_pair = tuple(sorted([spell_1, spell_2])) if spell_1 > 0 and spell_2 > 0 else tuple()
+        build_key = (tuple(matchup_core), matchup_boots, spell_pair)
+        if build_key not in build_stats:
+            build_stats[build_key] = {"wins": 0, "games": 0}
+        build_stats[build_key]["games"] += 1
+        build_stats[build_key]["wins"] += 1 if win else 0
+
+        rune = row.get("rune", {})
+        rune_key = (
+            safe_num((rune or {}).get("perk_primary_style")),
+            safe_num((rune or {}).get("perk_0")),
+            safe_num((rune or {}).get("perk_1")),
+            safe_num((rune or {}).get("perk_2")),
+            safe_num((rune or {}).get("perk_3")),
+            safe_num((rune or {}).get("perk_sub_style")),
+            safe_num((rune or {}).get("perk_4")),
+            safe_num((rune or {}).get("perk_5")),
+            safe_num((rune or {}).get("stat_perk_0")),
+            safe_num((rune or {}).get("stat_perk_1")),
+            safe_num((rune or {}).get("stat_perk_2")),
+        )
+        if rune_key not in rune_stats:
+            rune_stats[rune_key] = {"wins": 0, "games": 0}
+        rune_stats[rune_key]["games"] += 1
+        rune_stats[rune_key]["wins"] += 1 if win else 0
+
+    sample_games = len(rows_for_model)
+    sample_win_rate = round((wins * 100 / sample_games), 1) if sample_games else 0.0
+    selected_build_key, build_wr, build_games = choose_best_setup(build_stats, sample_count=sample_games)
+    selected_rune_key, rune_wr, rune_games = choose_best_setup(rune_stats, sample_count=sample_games)
+
+    build_core_ids = list(selected_build_key[0]) if selected_build_key else []
+    build_boots_id = safe_num(selected_build_key[1]) if selected_build_key else 0
+    build_spell_ids = list(selected_build_key[2]) if selected_build_key else []
+    rune_values = selected_rune_key if selected_rune_key else tuple([0] * 11)
+    primary_style_id = safe_num(rune_values[0]) if len(rune_values) > 0 else 0
+    selected_keystone = safe_num(rune_values[1]) if len(rune_values) > 1 else 0
+    primary_rune_ids = [safe_num(v) for v in rune_values[2:5] if safe_num(v) > 0]
+    selected_secondary_style = safe_num(rune_values[5]) if len(rune_values) > 5 else 0
+    secondary_rune_ids = [safe_num(v) for v in rune_values[6:8] if safe_num(v) > 0]
+    shard_ids = [safe_num(v) for v in rune_values[8:11] if safe_num(v) > 0]
+
+    your_core_ids = [safe_num(v) for v in (your_setup.get("coreItemIds", []) or []) if safe_num(v) > 0]
+    your_runes = your_setup.get("runes", {}) if isinstance(your_setup, dict) else {}
+    your_keystone_id = safe_num((your_runes or {}).get("keystoneId"))
+    your_secondary_style_id = safe_num((your_runes or {}).get("secondaryStyleId"))
+    missing_from_your_core = [item_id for item_id in build_core_ids if item_id not in your_core_ids]
+    extra_in_your_core = [item_id for item_id in your_core_ids if item_id not in build_core_ids]
+    advice: list[str] = []
+    if sample_games < 8:
+        advice.append("Low sample size for this matchup; treat build suggestions as directional.")
+    if missing_from_your_core:
+        advice.append(
+            f"Prioritize into this lane: {', '.join(ids_to_names(missing_from_your_core, item_names, 'Item'))}."
+        )
+    if selected_keystone and your_keystone_id and selected_keystone != your_keystone_id:
+        advice.append(
+            f"Swap keystone to {id_name(selected_keystone, rune_names, 'Rune')} for this matchup."
+        )
+    if selected_secondary_style and your_secondary_style_id and selected_secondary_style != your_secondary_style_id:
+        advice.append(
+            f"Use {id_name(selected_secondary_style, rune_names, 'Rune')} as the secondary tree versus this champion."
+        )
+    if sample_win_rate < 50:
+        advice.append("KR OTP sample is below 50% here; play lane safer and prioritize vision tempo.")
+    if not advice:
+        advice.append("Your current Karma setup is already close to this matchup recommendation.")
+
+    return {
+        "source": "deeplol.gg",
+        "region": "KR",
+        "eloFilter": "DIAMOND+ (closest available to D2+)",
+        "dataNote": data_note,
+        "champion": "Karma",
+        "selectedEnemySupportId": selected_support,
+        "selectedEnemyBotId": selected_bot,
+        "selectedEnemySupport": champion_names.get(selected_support, "Unknown"),
+        "selectedEnemyBot": champion_names.get(selected_bot, "Unknown"),
+        "championOptions": champion_options,
+        "sampleMatches": sample_games,
+        "aggregate": {
+            "wins": wins,
+            "losses": max(sample_games - wins, 0),
+            "winRate": sample_win_rate,
+        },
+        "bestBuild": {
+            "coreItemIds": build_core_ids,
+            "coreItems": ids_to_names(build_core_ids, item_names, "Item"),
+            "coreItemsDetailed": build_item_details(build_core_ids, item_names, ddragon_version),
+            "bootsId": build_boots_id,
+            "boots": id_name(build_boots_id, item_names, "Item") if build_boots_id else "-",
+            "bootsDetailed": build_item_details([build_boots_id], item_names, ddragon_version) if build_boots_id else [],
+            "summonerSpellIds": build_spell_ids,
+            "summonerSpells": ids_to_names(build_spell_ids, spell_names, "Spell"),
+            "summonerSpellsDetailed": build_spell_details(build_spell_ids, spell_names, spell_icons),
+            "winRate": build_wr,
+            "games": build_games,
+        },
+        "bestRunes": {
+            "primaryStyleId": primary_style_id,
+            "primaryStyle": id_name(primary_style_id, rune_names, "Rune") if primary_style_id else "-",
+            "keystoneId": selected_keystone,
+            "keystone": id_name(selected_keystone, rune_names, "Rune"),
+            "keystoneDetailed": build_rune_details([selected_keystone], rune_names, rune_icons),
+            "primaryRuneIds": primary_rune_ids,
+            "primaryRunes": ids_to_names(primary_rune_ids, rune_names, "Rune"),
+            "primaryRunesDetailed": build_rune_details(primary_rune_ids, rune_names, rune_icons),
+            "secondaryStyleId": selected_secondary_style,
+            "secondaryStyle": id_name(selected_secondary_style, rune_names, "Rune"),
+            "secondaryRuneIds": secondary_rune_ids,
+            "secondaryRunes": ids_to_names(secondary_rune_ids, rune_names, "Rune"),
+            "secondaryRunesDetailed": build_rune_details(secondary_rune_ids, rune_names, rune_icons),
+            "statShardIds": shard_ids,
+            "statShards": ids_to_names(shard_ids, rune_names, "Rune"),
+            "statShardsDetailed": build_rune_details(shard_ids, rune_names, rune_icons),
+            "winRate": rune_wr,
+            "games": rune_games,
+        },
+        "you": your_setup,
+        "comparison": {
+            "missingFromYourCoreIds": missing_from_your_core,
+            "missingFromYourCore": ids_to_names(missing_from_your_core, item_names, "Item"),
+            "extraInYourCoreIds": extra_in_your_core,
+            "extraInYourCore": ids_to_names(extra_in_your_core, item_names, "Item"),
+            "keystoneMatch": bool(selected_keystone and your_keystone_id and selected_keystone == your_keystone_id),
+            "secondaryTreeMatch": bool(
+                selected_secondary_style
+                and your_secondary_style_id
+                and selected_secondary_style == your_secondary_style_id
+            ),
+        },
+        "advice": advice,
+    }
 
 
 def is_support_quest_item(item_id: int) -> bool:
@@ -713,6 +1236,8 @@ def karma_otp_comparison_from_deeplol(
             rune_icons,
             spell_names,
             spell_icons,
+            _champion_names,
+            _champion_icons,
         ) = get_static_reference_maps()
         otp_rows = get_karma_otp_rows_from_deeplol(limit=12)
         selected_row = next(
@@ -933,7 +1458,8 @@ def player_summary(
     platform: str,
     match_count: int,
     api_key: str,
-    selected_otp_puu_id: str,
+    selected_enemy_support_id: int,
+    selected_enemy_bot_id: int,
     debug_mode: bool = False,
 ) -> dict[str, Any]:
     routing = PLATFORM_TO_ROUTING.get(platform)
@@ -1021,6 +1547,8 @@ def player_summary(
     karma_lane_samples = 0
     karma_trend: list[dict[str, Any]] = []
     matchup_stats: dict[str, dict[str, Any]] = {}
+    enemy_support_counter: Counter[int] = Counter()
+    enemy_bot_counter: Counter[int] = Counter()
 
     for match_id in match_ids:
         match_url = f"https://{routing}.api.riotgames.com/lol/match/v5/matches/{match_id}"
@@ -1137,6 +1665,8 @@ def player_summary(
             )
             enemy_support_name = (enemy_support or {}).get("championName", "Unknown")
             enemy_bot_name = (enemy_bot or {}).get("championName", "Unknown")
+            enemy_support_id = safe_num((enemy_support or {}).get("championId"))
+            enemy_bot_id = safe_num((enemy_bot or {}).get("championId"))
             matchup_key = f"{enemy_support_name}|{enemy_bot_name}"
             if matchup_key not in matchup_stats:
                 matchup_stats[matchup_key] = {
@@ -1153,6 +1683,10 @@ def player_summary(
             matchup_stats[matchup_key]["kpSum"] += kill_participation
             matchup_stats[matchup_key]["deathsSum"] += deaths
             matchup_stats[matchup_key]["visionPerMinSum"] += vision_score / duration_minutes
+            if enemy_support_id > 0:
+                enemy_support_counter[enemy_support_id] += 1
+            if enemy_bot_id > 0:
+                enemy_bot_counter[enemy_bot_id] += 1
 
             assists_14 = 0
             deaths_14 = 0
@@ -1171,7 +1705,7 @@ def player_summary(
                 timeline_info = timeline.get("info", {})
                 frames = timeline_info.get("frames", []) if isinstance(timeline_info, dict) else []
                 participant_id = safe_num(participant.get("participantId"))
-                enemy_support_id = safe_num((enemy_support or {}).get("participantId"))
+                enemy_support_pid = safe_num((enemy_support or {}).get("participantId"))
 
                 for frame in frames:
                     frame_ts = safe_num(frame.get("timestamp"))
@@ -1192,10 +1726,10 @@ def player_summary(
                             assists_14 += 1
 
                 frame_14 = frame_at_or_before(frames, 14 * 60 * 1000)
-                if frame_14 and participant_id > 0 and enemy_support_id > 0:
+                if frame_14 and participant_id > 0 and enemy_support_pid > 0:
                     pframes = frame_14.get("participantFrames", {})
                     my_frame = pframes.get(str(participant_id), {}) if isinstance(pframes, dict) else {}
-                    opp_frame = pframes.get(str(enemy_support_id), {}) if isinstance(pframes, dict) else {}
+                    opp_frame = pframes.get(str(enemy_support_pid), {}) if isinstance(pframes, dict) else {}
                     if isinstance(my_frame, dict) and isinstance(opp_frame, dict):
                         gold_diff_14 = safe_num(my_frame.get("totalGold")) - safe_num(opp_frame.get("totalGold"))
                         xp_diff_14 = safe_num(my_frame.get("xp")) - safe_num(opp_frame.get("xp"))
@@ -1290,10 +1824,18 @@ def player_summary(
         reverse=True,
     )[:10]
 
-    karma_comparison = karma_otp_comparison_from_deeplol(
+    selected_support_id = safe_num(selected_enemy_support_id)
+    selected_bot_id = safe_num(selected_enemy_bot_id)
+    if selected_support_id <= 0 and enemy_support_counter:
+        selected_support_id = enemy_support_counter.most_common(1)[0][0]
+    if selected_bot_id <= 0 and enemy_bot_counter:
+        selected_bot_id = enemy_bot_counter.most_common(1)[0][0]
+
+    karma_matchup = karma_matchup_recommendation_from_deeplol(
+        enemy_support_id=selected_support_id,
+        enemy_bot_id=selected_bot_id,
         karma_games=karma_games,
         karma_wins=karma_wins,
-        selected_otp_puu_id=selected_otp_puu_id,
         karma_item_counter=karma_item_counter,
         karma_keystone_counter=karma_keystone_counter,
         karma_primary_style_counter=karma_primary_style_counter,
@@ -1315,12 +1857,6 @@ def player_summary(
     gold_diff_14 = round((karma_gold_diff_14_sum / karma_lane_samples), 1) if karma_lane_samples else 0.0
     xp_diff_14 = round((karma_xp_diff_14_sum / karma_lane_samples), 1) if karma_lane_samples else 0.0
 
-    benchmark = karma_comparison.get("top5Benchmark", {})
-    benchmark_avg = benchmark.get("averages", {}) if isinstance(benchmark, dict) else {}
-    delta_vs_top5 = {
-        "winRate": round(karma_win_rate - float(benchmark_avg.get("winRate", 0.0) or 0.0), 1),
-        "kda": round(karma_kda - float(benchmark_avg.get("kda", 0.0) or 0.0), 2),
-    }
     delta_vs_targets = {
         "killParticipation": round(karma_kp - HIGH_LEVEL_TARGETS["kp"], 1),
         "deathsPerGame": round(karma_deaths_pg - HIGH_LEVEL_TARGETS["deaths"], 2),
@@ -1386,7 +1922,7 @@ def player_summary(
             "avgAllyUtility": round((total_ally_utility / support_games), 0) if support_games else 0.0,
             "avgCcScore": round((total_cc_score / support_games), 1) if support_games else 0.0,
         },
-        "karmaOtpComparison": karma_comparison,
+        "karmaMatchup": karma_matchup,
         "karmaInsights": {
             "sampleMatches": KARMA_SETUP_MATCH_COUNT,
             "analyzedKarmaGames": karma_games,
@@ -1403,9 +1939,7 @@ def player_summary(
                 "goldDiff14": gold_diff_14,
                 "xpDiff14": xp_diff_14,
             },
-            "top5OtpAverages": benchmark_avg,
             "targetBands": HIGH_LEVEL_TARGETS,
-            "deltaVsTop5": delta_vs_top5,
             "deltaVsTargets": delta_vs_targets,
             "trend": karma_trend,
             "lanePhase": {
@@ -1448,7 +1982,8 @@ class LoLTrackerHandler(SimpleHTTPRequestHandler):
         game_name = LOCKED_GAME_NAME
         tag_line = LOCKED_TAG_LINE
         platform = query.get("platform", [PLATFORM_FIXED])[0].strip().lower()
-        selected_otp_puu_id = query.get("otp_puu_id", [""])[0].strip()
+        selected_enemy_support_id = safe_num(query.get("enemy_support_id", ["0"])[0])
+        selected_enemy_bot_id = safe_num(query.get("enemy_bot_id", ["0"])[0])
         debug_mode = query.get("debug", ["0"])[0].strip() == "1"
 
         if platform != PLATFORM_FIXED:
@@ -1474,7 +2009,8 @@ class LoLTrackerHandler(SimpleHTTPRequestHandler):
                 platform=platform,
                 match_count=matches,
                 api_key=api_key,
-                selected_otp_puu_id=selected_otp_puu_id,
+                selected_enemy_support_id=selected_enemy_support_id,
+                selected_enemy_bot_id=selected_enemy_bot_id,
                 debug_mode=debug_mode,
             )
             return json_response(self, HTTPStatus.OK, payload)
