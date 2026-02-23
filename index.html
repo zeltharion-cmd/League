@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoL Stat Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <p class="eyebrow">MyPower</p>
+      <h1>Karma Kommand Kenter</h1>
+      <p class="subtitle">Locked to feelsbanman#EUW with support-first tracking for vision, utility, and impact.</p>
+    </header>
+
+    <section class="search-card">
+      <form id="searchForm" class="search-form">
+        <input id="accountLock" type="text" value="Account: feelsbanman #EUW" readonly>
+        <input id="regionLock" type="text" value="Region: EUW1 only" readonly>
+        <button id="searchBtn" type="submit">Refresh</button>
+      </form>
+      <p id="statusText" class="status">Shows latest 5 matches. Karma setup comparison uses latest 30 games.</p>
+    </section>
+
+    <section class="card otp-card">
+      <div class="otp-head">
+        <div>
+          <h3>Korea OTP Karma Benchmark (Deeplol)</h3>
+          <p id="otpStatus" class="status">Loading KR OTP comparison...</p>
+        </div>
+        <div class="otp-controls">
+          <label for="otpSelect">OTP Profile</label>
+          <select id="otpSelect"></select>
+        </div>
+      </div>
+      <div class="otp-grid">
+        <article class="mini otp-block">
+          <h4>Best OTP Profile</h4>
+          <div id="otpProfile" class="stack-text">Loading...</div>
+        </article>
+        <article class="mini otp-block">
+          <h4>OTP Build</h4>
+          <div id="otpBuild" class="stack-text">Loading...</div>
+          <div id="otpBuildIcons" class="icon-row"></div>
+          <button id="otpRunesBtn" type="button" class="rune-btn">Open OTP Runes</button>
+        </article>
+        <article class="mini otp-block">
+          <h4>Your Karma Setup</h4>
+          <div id="yourBuild" class="stack-text">Loading...</div>
+          <div id="yourBuildIcons" class="icon-row"></div>
+          <button id="yourRunesBtn" type="button" class="rune-btn">Open Your Runes</button>
+        </article>
+        <article class="mini otp-block">
+          <h4>What To Change</h4>
+          <ul id="otpAdvice" class="advice-list">
+            <li>Loading...</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <div id="runesModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="runesTitle">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3 id="runesTitle">Runes</h3>
+          <button id="closeRunesModal" type="button" class="close-btn">Close</button>
+        </div>
+        <div id="runesBody" class="runes-layout"></div>
+      </div>
+    </div>
+
+    <section id="dashboard" class="dashboard hidden">
+      <div class="profile-card card">
+        <h2 id="playerHeading">Player</h2>
+        <div id="profileMeta" class="profile-meta"></div>
+      </div>
+
+      <div class="aggregate-grid">
+        <article class="card metric"><h3>Games</h3><p id="gamesMetric">-</p></article>
+        <article class="card metric"><h3>Win Rate</h3><p id="winRateMetric">-</p></article>
+        <article class="card metric"><h3>Avg KDA</h3><p id="kdaMetric">-</p></article>
+        <article class="card metric"><h3>Avg CS</h3><p id="csMetric">-</p></article>
+      </div>
+
+      <div class="card support-focus">
+        <h3>Support Focus</h3>
+        <div class="support-grid">
+          <article class="metric mini"><h4>Primary Role</h4><p id="supportRoleMetric">-</p></article>
+          <article class="metric mini"><h4>Support Rate</h4><p id="supportRateMetric">-</p></article>
+          <article class="metric mini"><h4>Vision / Game</h4><p id="supportVisionMetric">-</p></article>
+          <article class="metric mini"><h4>Control Wards / Game</h4><p id="supportControlMetric">-</p></article>
+          <article class="metric mini"><h4>Kill Participation</h4><p id="supportKpMetric">-</p></article>
+          <article class="metric mini"><h4>Ally Utility / Game</h4><p id="supportUtilityMetric">-</p></article>
+        </div>
+      </div>
+
+      <div class="card wide">
+        <h3>Top 5 KR OTP Benchmark</h3>
+        <div id="benchmarkMeta" class="stack-text"></div>
+        <div id="benchmarkBuildIcons" class="icon-row"></div>
+        <div id="deltaBadges" class="delta-row"></div>
+      </div>
+
+      <div class="card wide">
+        <h3>Karma Improvement Score</h3>
+        <div id="improvementScore" class="score-box">-</div>
+        <ul id="focusTargets" class="advice-list"></ul>
+      </div>
+
+      <div class="card wide">
+        <h3>Karma Trend (Last 30 Sample)</h3>
+        <div id="trendChart" class="trend-chart"></div>
+      </div>
+
+      <div class="card wide">
+        <h3>Lane Phase (First 14m)</h3>
+        <div id="laneStats" class="stack-text"></div>
+      </div>
+
+      <div class="card wide">
+        <h3>Matchup Breakdown</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Enemy Support</th>
+                <th>Enemy Bot</th>
+                <th>Games</th>
+                <th>Win Rate</th>
+                <th>Avg KP</th>
+                <th>Avg Deaths</th>
+                <th>Vision/min</th>
+              </tr>
+            </thead>
+            <tbody id="matchupBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card wide">
+        <h3>Recent Matches</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Champion</th>
+                <th>Role</th>
+                <th>Result</th>
+                <th>K / D / A</th>
+                <th>KP</th>
+                <th>Vision</th>
+                <th>Ctrl</th>
+                <th>Clear</th>
+                <th>Utility</th>
+                <th>CS</th>
+                <th>Gold</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody id="matchesBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
