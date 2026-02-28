@@ -51,6 +51,7 @@ const supportControlMetricEl = document.getElementById("supportControlMetric");
 const supportKpMetricEl = document.getElementById("supportKpMetric");
 const supportUtilityMetricEl = document.getElementById("supportUtilityMetric");
 const matchesBodyEl = document.getElementById("matchesBody");
+const matrixRainCanvasEl = document.getElementById("matrixRain");
 
 const THEME_INPUT_IDS = {
   "--bg-0": "color-bg-0",
@@ -66,8 +67,8 @@ const THEME_INPUT_IDS = {
 
 const PRESET_THEMES = [
   {
-    name: "Rift Gold",
-    vars: { "--bg-0": "#060b14", "--bg-1": "#0a1526", "--panel": "#0f2138", "--panel-soft": "#132a46", "--ink": "#f4ead4", "--muted": "#a6bdd2", "--gold": "#c8a461", "--gold-strong": "#f0d08f", "--accent": "#41a5d3" },
+    name: "Monochrome",
+    vars: { "--bg-0": "#050505", "--bg-1": "#121212", "--panel": "#0f0f0f", "--panel-soft": "#1a1a1a", "--ink": "#f5f5f5", "--muted": "#b9b9b9", "--gold": "#dddddd", "--gold-strong": "#ffffff", "--accent": "#f2f2f2" },
   },
   {
     name: "Arc Light",
@@ -107,7 +108,7 @@ const PRESET_THEMES = [
   },
 ];
 
-const THEME_STORAGE_KEY = "kk_theme_vars";
+const THEME_STORAGE_KEY = "kk_theme_vars_v2";
 const RAIN_STORAGE_KEY = "kk_rain";
 
 let selectedEnemySupportId = 0;
@@ -115,6 +116,7 @@ let selectedEnemyBotId = 0;
 let supportOptionsAll = [];
 let botOptionsAll = [];
 let matchupRunesCache = {};
+let matrixRainController = null;
 
 function safeNum(value) {
   const n = Number(value);
@@ -208,7 +210,127 @@ function applyRainEnabled(enabled) {
   if (rainToggleEl) {
     rainToggleEl.checked = enabled;
   }
+  if (matrixRainController) {
+    matrixRainController.setEnabled(enabled);
+  }
   localStorage.setItem(RAIN_STORAGE_KEY, enabled ? "1" : "0");
+}
+
+function createMatrixRainController() {
+  if (!matrixRainCanvasEl) {
+    return null;
+  }
+
+  const canvas = matrixRainCanvasEl;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return null;
+  }
+
+  const charset = "01ABCDEFGHIJKLMNOPQRSTUVWXYZ$#@%&*+-=<>[]{}";
+  const fontSize = 16;
+  let columns = 0;
+  let drops = [];
+  let running = false;
+  let frameId = 0;
+  let lastFrameAt = 0;
+  let dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+
+  function resizeCanvas() {
+    const width = Math.max(1, window.innerWidth);
+    const height = Math.max(1, window.innerHeight);
+    dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    columns = Math.max(1, Math.floor(width / fontSize));
+    drops = Array.from({ length: columns }, () => Math.floor(Math.random() * Math.floor(height / fontSize)));
+  }
+
+  function getFrameColors() {
+    const style = getComputedStyle(document.documentElement);
+    const accent = style.getPropertyValue("--accent").trim() || "#f2f2f2";
+    const bg = style.getPropertyValue("--bg-0").trim() || "#050505";
+    return { accent, bg };
+  }
+
+  function drawFrame(timestamp) {
+    if (!running) {
+      return;
+    }
+
+    if (timestamp - lastFrameAt < 55) {
+      frameId = window.requestAnimationFrame(drawFrame);
+      return;
+    }
+    lastFrameAt = timestamp;
+
+    const width = canvas.width / dpr;
+    const height = canvas.height / dpr;
+    const { accent, bg } = getFrameColors();
+
+    context.fillStyle = `${bg}20`;
+    context.fillRect(0, 0, width, height);
+
+    context.font = `700 ${fontSize}px "Consolas", "Courier New", monospace`;
+    context.textBaseline = "top";
+    context.shadowColor = accent;
+    context.shadowBlur = 6;
+
+    for (let idx = 0; idx < drops.length; idx += 1) {
+      const letter = charset[Math.floor(Math.random() * charset.length)];
+      const x = idx * fontSize;
+      const y = drops[idx] * fontSize;
+
+      context.fillStyle = accent;
+      context.fillText(letter, x, y);
+
+      if (y > height && Math.random() > 0.975) {
+        drops[idx] = 0;
+      } else {
+        drops[idx] += 1;
+      }
+    }
+
+    frameId = window.requestAnimationFrame(drawFrame);
+  }
+
+  function start() {
+    if (running) {
+      return;
+    }
+    running = true;
+    canvas.classList.remove("hidden");
+    lastFrameAt = 0;
+    frameId = window.requestAnimationFrame(drawFrame);
+  }
+
+  function stop() {
+    running = false;
+    if (frameId) {
+      window.cancelAnimationFrame(frameId);
+      frameId = 0;
+    }
+    context.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    canvas.classList.add("hidden");
+  }
+
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  return {
+    setEnabled(enabled) {
+      if (enabled) {
+        start();
+      } else {
+        stop();
+      }
+    },
+  };
 }
 
 function readCurrentThemeVars() {
@@ -705,6 +827,7 @@ if (searchFormEl) {
 }
 
 function boot() {
+  matrixRainController = createMatrixRainController();
   initThemeControls();
   void refreshStats();
 }
