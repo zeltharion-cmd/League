@@ -73,7 +73,7 @@ const THEME_INPUT_IDS = {
 const PRESET_THEMES = [
   {
     name: "Monochrome",
-    vars: { "--bg-0": "#050505", "--bg-1": "#121212", "--panel": "#0f0f0f", "--panel-soft": "#1a1a1a", "--ink": "#f5f5f5", "--muted": "#b9b9b9", "--gold": "#dddddd", "--gold-strong": "#ffffff", "--accent": "#f2f2f2" },
+    vars: { "--bg-0": "#000000", "--bg-1": "#060606", "--panel": "#090909", "--panel-soft": "#111111", "--ink": "#f8fcff", "--muted": "#cad5e2", "--gold": "#e7eef8", "--gold-strong": "#ffffff", "--accent": "#e9f4ff" },
   },
   {
     name: "Arc Light",
@@ -113,7 +113,7 @@ const PRESET_THEMES = [
   },
 ];
 
-const THEME_STORAGE_KEY = "kk_theme_vars_v2";
+const THEME_STORAGE_KEY = "kk_theme_vars_v3";
 const RAIN_STORAGE_KEY = "kk_rain";
 
 let selectedEnemySupportId = 0;
@@ -259,8 +259,8 @@ function createMatrixRainController() {
 
   function getFrameColors() {
     const style = getComputedStyle(document.documentElement);
-    const accent = style.getPropertyValue("--accent").trim() || "#f2f2f2";
-    const bg = style.getPropertyValue("--bg-0").trim() || "#050505";
+    const accent = style.getPropertyValue("--accent").trim() || "#e9f4ff";
+    const bg = style.getPropertyValue("--bg-0").trim() || "#000000";
     return { accent, bg };
   }
 

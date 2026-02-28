@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260228-6">
+  <link rel="stylesheet" href="styles.css?v=20260228-10">
 </head>
 <body>
   <canvas id="matrixRain" aria-hidden="true"></canvas>
@@ -56,6 +56,7 @@
       <div class="otp-grid">
         <article class="mini otp-block">
           <h4>Best Build Vs Current Botlane</h4>
+          <div id="enemyPairVisual" class="enemy-pair"></div>
           <div id="matchupBuild" class="stack-text">Loading...</div>
           <div id="matchupBuildIcons" class="icon-row"></div>
           <button id="matchupRunesBtn" type="button" class="rune-btn">Open Matchup Runes</button>
@@ -152,52 +153,8 @@
         <div id="laneStats" class="stack-text"></div>
       </div>
 
-      <div class="card wide">
-        <h3>Matchup Breakdown</h3>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Enemy Support</th>
-                <th>Enemy Bot</th>
-                <th>Games</th>
-                <th>Win Rate</th>
-                <th>Avg KP</th>
-                <th>Avg Deaths</th>
-                <th>Vision/min</th>
-              </tr>
-            </thead>
-            <tbody id="matchupBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card wide">
-        <h3>Recent Matches</h3>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Champion</th>
-                <th>Role</th>
-                <th>Result</th>
-                <th>K / D / A</th>
-                <th>KP</th>
-                <th>Vision</th>
-                <th>Ctrl</th>
-                <th>Clear</th>
-                <th>Utility</th>
-                <th>CS</th>
-                <th>Gold</th>
-                <th>Duration</th>
-              </tr>
-            </thead>
-            <tbody id="matchesBody"></tbody>
-          </table>
-        </div>
-      </div>
     </section>
   </main>
-  <script src="app.js?v=20260228-6"></script>
+  <script src="app.js?v=20260228-10"></script>
 </body>
 </html>
