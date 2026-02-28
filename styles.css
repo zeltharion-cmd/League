@@ -15,6 +15,9 @@
   --accent: #e9f4ff;
   --win: #3bc287;
   --loss: #cd5e5e;
+  --motion-fast: 140ms;
+  --motion-slow: 240ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 * {
@@ -31,6 +34,7 @@ body {
   overflow-x: hidden;
   margin: 0;
   font-family: "Manrope", "Segoe UI", sans-serif;
+  line-height: 1.35;
   color: var(--ink);
   background:
     radial-gradient(1200px 900px at 0% -15%, rgba(233, 244, 255, 0.08), transparent 45%),
@@ -107,6 +111,7 @@ body::after {
   border-radius: 16px;
   padding: 1rem 1.1rem 1.2rem;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.94);
+  animation: section-enter 260ms var(--ease-out) both;
 }
 
 .hero::before {
@@ -159,10 +164,26 @@ body::after {
   box-shadow:
     inset 0 0 0 1px rgba(0, 0, 0, 0.86),
     0 8px 20px rgba(0, 0, 0, 0.18);
+  transition:
+    transform var(--motion-slow) var(--ease-out),
+    box-shadow var(--motion-slow) var(--ease-out),
+    border-color var(--motion-fast) ease,
+    background var(--motion-slow) var(--ease-out);
 }
 
 .search-card {
   padding: 0.75rem;
+  animation: section-enter 280ms var(--ease-out) both;
+  animation-delay: 40ms;
+}
+
+.search-card:hover,
+.card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.26);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.86),
+    0 14px 28px rgba(0, 0, 0, 0.22);
 }
 
 .search-form {
@@ -182,6 +203,10 @@ body::after {
   font: inherit;
   padding: 0.45rem 0.64rem;
   color-scheme: dark;
+  transition:
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    background var(--motion-fast) ease;
 }
 
 .search-form input:focus,
@@ -271,10 +296,19 @@ body::after {
   background: linear-gradient(180deg, var(--gold-strong), #a7a7a7);
   cursor: pointer;
   box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3);
+  transition:
+    filter var(--motion-fast) ease,
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
 }
 
 #searchBtn:hover {
   filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+#searchBtn:active {
+  transform: translateY(0);
 }
 
 #searchBtn:disabled {
@@ -298,6 +332,8 @@ body::after {
 
 .otp-card {
   padding: 0.75rem;
+  animation: section-enter 320ms var(--ease-out) both;
+  animation-delay: 110ms;
 }
 
 .otp-head {
@@ -336,6 +372,10 @@ body::after {
   color: var(--ink);
   font: inherit;
   padding: 0.38rem 0.55rem;
+  transition:
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    background var(--motion-fast) ease;
 }
 
 .filter-input:focus {
@@ -422,11 +462,18 @@ body::after {
   font-weight: 700;
   letter-spacing: 0.03em;
   cursor: pointer;
+  transition:
+    border-color var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
 }
 
 .rune-btn:hover {
   border-color: #ffffff;
   color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
 }
 
 .modal {
@@ -526,6 +573,15 @@ body::after {
   background: linear-gradient(170deg, rgba(30, 30, 30, 0.9), rgba(15, 15, 15, 0.95));
   border-radius: 11px;
   padding: 0.55rem 0.6rem;
+  transition:
+    transform var(--motion-slow) var(--ease-out),
+    border-color var(--motion-fast) ease,
+    background var(--motion-slow) var(--ease-out);
+}
+
+.mini:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .mini h4 {
@@ -659,6 +715,8 @@ body::after {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 0.62rem;
+  animation: section-enter 300ms var(--ease-out) both;
+  animation-delay: 80ms;
 }
 
 .card {
@@ -795,10 +853,17 @@ body.rain-off #matrixRain {
   font-weight: 700;
   padding: 0.38rem 0.68rem;
   cursor: pointer;
+  transition:
+    border-color var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
 }
 
 .customize-btn:hover {
   border-color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
 }
 
 .setup-headline {
@@ -842,10 +907,16 @@ body.rain-off #matrixRain {
   font: inherit;
   font-size: 0.8rem;
   font-weight: 700;
+  transition:
+    border-color var(--motion-fast) ease,
+    transform var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
 }
 
 .preset-btn:hover {
   border-color: rgba(255, 255, 255, 0.68);
+  transform: translateY(-1px);
+  filter: brightness(1.05);
 }
 
 .color-grid {
@@ -895,6 +966,17 @@ body.rain-off #matrixRain {
   }
 }
 
+@keyframes section-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 1120px) {
   .support-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -908,6 +990,27 @@ body.rain-off #matrixRain {
 @media (prefers-reduced-motion: reduce) {
   #matrixRain {
     display: none;
+  }
+
+  .hero,
+  .search-card,
+  .dashboard,
+  .otp-card {
+    animation: none !important;
+  }
+
+  .search-card,
+  .card,
+  .mini,
+  #searchBtn,
+  .rune-btn,
+  .customize-btn,
+  .preset-btn,
+  .search-form input,
+  .search-form select,
+  .otp-controls select,
+  .filter-input {
+    transition: none !important;
   }
 }
 

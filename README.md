@@ -53,6 +53,7 @@ git push -u origin main
 - Latest 5 matches (fixed display)
 - Aggregate stats (win rate, KDA, CS)
 - Support-focused metrics (vision, control wards, kill participation, ally utility)
+- Matchup recommendations blended from Deeplol Diamond+ rows plus your Riot recent same-matchup data
 - KR Deeplol Karma OTP comparison with selectable OTP profiles
 - Build pictures for OTP and your setup
 - Rune popup for OTP and your setup
@@ -66,4 +67,5 @@ git push -u origin main
 - The tracker is EUW-only (`euw1`) and account-locked in server code.
 - Requests for other accounts are ignored by design.
 - Deeplol OTP benchmark data is fetched from `b2c-api-cdn.deeplol.gg` and cached for 5 minutes.
+- Matchup winrate sources now include Deeplol + Riot recent matchup samples (combined model in API response).
 - For production, run behind HTTPS and keep your API key on the server only.

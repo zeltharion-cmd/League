@@ -155,6 +155,20 @@ function line(label, value) {
   return `<div><strong>${label}:</strong> ${value}</div>`;
 }
 
+function renderWinrateSources(sources) {
+  if (!Array.isArray(sources) || !sources.length) {
+    return "-";
+  }
+  return sources
+    .map((source) => {
+      const name = String(source?.name || "Source");
+      const wr = `${safeNum(source?.winRate).toFixed(1)}%`;
+      const games = safeNum(source?.games);
+      return `${name}: ${wr} (${games}g)`;
+    })
+    .join("<br>");
+}
+
 function renderIconChip(item) {
   if (!item || !item.icon) {
     return "";
@@ -641,14 +655,15 @@ function renderHighEloMatchup(payload) {
       matchupBuildEl,
       line("Enemy Support", data.selectedEnemySupport || "-") +
       line("Enemy Bot", data.selectedEnemyBot || "-") +
-      line("Status", "No recommendation available at or above 50% win rate.")
+      line("Status", "No recommendation available above 50% win rate.")
     );
     setHtml(matchupBuildIconsEl, "");
     setHtml(
       matchupMetaEl,
       line("Filter", "Diamond+ only") +
       line("Sample", `${safeNum(data.sampleMatches)} games (${safeNum(data.aggregate?.winRate).toFixed(1)}% WR)`) +
-      line("Rule", "Minimum 50.0% win rate for build and runes") +
+      line("Rule", "Only show recommendations with >50.0% WR (matchup, build, runes)") +
+      line("Winrate Sources", renderWinrateSources(data.winrateSources)) +
       line("Data Note", data.dataNote || "")
     );
     const advice = Array.isArray(data.advice) ? data.advice : [];
@@ -659,7 +674,7 @@ function renderHighEloMatchup(payload) {
     matchupRunesCache = { primary: [], secondary: [], shards: [] };
     setText(
       setupHeadlineEl,
-      `No >=50% Diamond+ recommendation found vs ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}.`
+      `No >50% Diamond+ recommendation found vs ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}.`
     );
     setMatchupStatus("No valid matchup recommendation above 50% win rate.");
     return;
@@ -694,6 +709,7 @@ function renderHighEloMatchup(payload) {
     line("Elo Filter", data.eloFilter || "DIAMOND+") +
     line("Build WR", `${safeNum(bestBuild.winRate).toFixed(1)}% in ${safeNum(bestBuild.games)} games`) +
     line("Rune WR", `${safeNum(bestRunes.winRate).toFixed(1)}% in ${safeNum(bestRunes.games)} games`) +
+    line("Winrate Sources", renderWinrateSources(data.winrateSources)) +
     line("Data Note", data.dataNote || "")
   );
 

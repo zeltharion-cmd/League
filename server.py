@@ -641,6 +641,7 @@ def karma_matchup_recommendation_from_deeplol(
     karma_secondary_style_counter: Counter[int],
     karma_secondary_keystone_counter: Counter[int],
     karma_spell_counter: Counter[tuple[int, int]],
+    karma_recent_match_rows: list[dict[str, Any]] | None,
     diagnostics: list[dict[str, Any]],
 ) -> dict[str, Any]:
     minimum_recommend_win_rate = 50.0
@@ -754,6 +755,16 @@ def karma_matchup_recommendation_from_deeplol(
         selected_support = 0
     if selected_bot <= 0 or selected_bot not in champion_names:
         selected_bot = 0
+    riot_rows_raw = karma_recent_match_rows if isinstance(karma_recent_match_rows, list) else []
+    riot_pair_rows: list[dict[str, Any]] = []
+    for row in riot_rows_raw:
+        if not isinstance(row, dict):
+            continue
+        if selected_support > 0 and safe_num(row.get("enemySupportId")) != selected_support:
+            continue
+        if selected_bot > 0 and safe_num(row.get("enemyBotId")) != selected_bot:
+            continue
+        riot_pair_rows.append(row)
 
     if selected_support <= 0 and selected_bot <= 0:
         return {
@@ -778,6 +789,7 @@ def karma_matchup_recommendation_from_deeplol(
         }
 
     matchup_rows: list[dict[str, Any]] = []
+    deeplol_fetch_error = ""
     try:
         page_count = max(1, MATCHUP_SETUP_MATCH_COUNT // MATCHUP_PAGE_SIZE)
         if selected_support > 0:
@@ -802,26 +814,18 @@ def karma_matchup_recommendation_from_deeplol(
                 "detail": str(exc)[:180],
             }
         )
-        return {
-            "source": "deeplol.gg",
-            "region": "KR",
-            "error": "Failed to load matchup build data.",
-            "detail": str(exc)[:200],
-            "selectedEnemySupportId": selected_support,
-            "selectedEnemyBotId": selected_bot,
-            "selectedEnemySupport": champion_names.get(selected_support, "Unknown"),
-            "selectedEnemyBot": champion_names.get(selected_bot, "Unknown"),
-            "championOptions": champion_options,
-            "supportChampionOptions": support_options,
-            "botChampionOptions": bot_options,
-        }
+        deeplol_fetch_error = str(exc)[:180]
 
-    if not matchup_rows:
+    if not matchup_rows and not riot_pair_rows:
         return {
-            "source": "deeplol.gg",
-            "region": "KR",
-            "eloFilter": "DIAMOND+ (closest available to D2+)",
-            "dataNote": "No matchup rows returned for this pair.",
+            "source": "deeplol.gg + riot.api",
+            "region": "KR + Recent",
+            "eloFilter": "DIAMOND+ (Deeplol) + Riot Recent Matchup",
+            "dataNote": (
+                "No matchup rows returned for this pair from Deeplol or Riot recent data."
+                if not deeplol_fetch_error
+                else f"No matchup rows returned. Deeplol detail: {deeplol_fetch_error}"
+            ),
             "selectedEnemySupportId": selected_support,
             "selectedEnemyBotId": selected_bot,
             "selectedEnemySupport": champion_names.get(selected_support, "Unknown"),
@@ -901,12 +905,26 @@ def karma_matchup_recommendation_from_deeplol(
 
     wins = 0
     high_elo_rows = [row for row in matchup_rows if is_diamond_plus(str(row.get("tier", "")))]
-    rows_for_model = high_elo_rows if high_elo_rows else matchup_rows
-    data_note = (
-        "Using DIAMOND+ rows from Deeplol (closest available to D2+)."
-        if high_elo_rows
-        else "Not enough DIAMOND+ rows; fell back to all available matchup rows."
-    )
+    deeplol_model_rows = high_elo_rows if high_elo_rows else matchup_rows
+    rows_for_model = list(deeplol_model_rows)
+    if riot_pair_rows:
+        rows_for_model.extend(riot_pair_rows)
+    deeplol_model_games = len(deeplol_model_rows)
+    riot_model_games = len(riot_pair_rows)
+    if deeplol_model_games and riot_model_games:
+        data_note = (
+            "Combined model: Deeplol DIAMOND+ (closest available to D2+) blended with your Riot recent same-matchup data."
+        )
+    elif deeplol_model_games:
+        data_note = (
+            "Using DIAMOND+ rows from Deeplol (closest available to D2+)."
+            if high_elo_rows
+            else "Not enough DIAMOND+ rows; fell back to all available Deeplol matchup rows."
+        )
+    else:
+        data_note = "Using Riot recent same-matchup data because Deeplol returned no usable rows."
+    if deeplol_fetch_error:
+        data_note = f"{data_note} Deeplol fetch detail: {deeplol_fetch_error}"
 
     build_stats: dict[tuple[Any, ...], dict[str, float]] = {}
     rune_stats: dict[tuple[Any, ...], dict[str, float]] = {}
@@ -948,13 +966,66 @@ def karma_matchup_recommendation_from_deeplol(
 
     sample_games = len(rows_for_model)
     sample_win_rate = round((wins * 100 / sample_games), 1) if sample_games else 0.0
+    deeplol_wins = sum(1 for row in deeplol_model_rows if safe_num(row.get("win")) == 1)
+    deeplol_sample_wr = round((deeplol_wins * 100 / deeplol_model_games), 1) if deeplol_model_games else 0.0
+    riot_wins = sum(1 for row in riot_pair_rows if safe_num(row.get("win")) == 1)
+    riot_sample_wr = round((riot_wins * 100 / riot_model_games), 1) if riot_model_games else 0.0
     selected_build_key, build_wr, build_games = choose_best_setup(build_stats, sample_count=sample_games)
     selected_rune_key, rune_wr, rune_games = choose_best_setup(rune_stats, sample_count=sample_games)
+    personal_wr = round((karma_wins * 100 / karma_games), 1) if karma_games else 0.0
+    winrate_sources = [
+        {
+            "name": "Deeplol Matchup (Diamond+)",
+            "winRate": deeplol_sample_wr,
+            "games": deeplol_model_games,
+        },
+        {
+            "name": "Riot Same Matchup (Recent)",
+            "winRate": riot_sample_wr,
+            "games": riot_model_games,
+        },
+        {
+            "name": "Combined Matchup Model",
+            "winRate": sample_win_rate,
+            "games": sample_games,
+        },
+        {
+            "name": "Deeplol Best Build",
+            "winRate": build_wr,
+            "games": build_games,
+        },
+        {
+            "name": "Deeplol Best Runes",
+            "winRate": rune_wr,
+            "games": rune_games,
+        },
+    ]
+    if karma_games > 0:
+        winrate_sources.append(
+            {
+                "name": "Riot Your Karma (Recent)",
+                "winRate": personal_wr,
+                "games": karma_games,
+            }
+        )
+    if deeplol_model_games and riot_model_games:
+        source_label = "deeplol.gg + riot.api"
+        region_label = "KR + Recent"
+        elo_label = "DIAMOND+ (Deeplol) + Riot Recent Matchup"
+    elif deeplol_model_games:
+        source_label = "deeplol.gg"
+        region_label = "KR"
+        elo_label = "DIAMOND+ (closest available to D2+)"
+    else:
+        source_label = "riot.api"
+        region_label = "Recent"
+        elo_label = "Riot Recent Matchup Sample"
     recommendation_available = bool(
         build_games > 0
         and rune_games > 0
-        and build_wr >= minimum_recommend_win_rate
-        and rune_wr >= minimum_recommend_win_rate
+        and sample_win_rate > minimum_recommend_win_rate
+        and build_wr > minimum_recommend_win_rate
+        and rune_wr > minimum_recommend_win_rate
     )
 
     build_core_ids = list(selected_build_key[0]) if selected_build_key else []
@@ -977,11 +1048,11 @@ def karma_matchup_recommendation_from_deeplol(
     advice: list[str] = []
     if not recommendation_available:
         return {
-            "source": "deeplol.gg",
-            "region": "KR",
-            "eloFilter": "DIAMOND+ (closest available to D2+)",
+            "source": source_label,
+            "region": region_label,
+            "eloFilter": elo_label,
             "dataNote": (
-                f"{data_note} Recommendation floor enabled: only show build/runes with >= "
+                f"{data_note} Recommendation floor enabled: only show build/runes with > "
                 f"{minimum_recommend_win_rate:.0f}% win rate."
             ),
             "champion": "Karma",
@@ -998,13 +1069,14 @@ def karma_matchup_recommendation_from_deeplol(
                 "losses": max(sample_games - wins, 0),
                 "winRate": sample_win_rate,
             },
+            "winrateSources": winrate_sources,
             "bestBuild": {},
             "bestRunes": {},
             "you": {},
             "comparison": {},
             "recommendationAvailable": False,
             "advice": [
-                f"No Diamond+ recommendation met the {minimum_recommend_win_rate:.0f}% win rate floor.",
+                f"No Diamond+ recommendation met the >{minimum_recommend_win_rate:.0f}% win rate floor.",
                 "Pick a different enemy support/bot pair or wait for more sample data.",
             ],
         }
@@ -1023,15 +1095,13 @@ def karma_matchup_recommendation_from_deeplol(
         advice.append(
             f"Use {id_name(selected_secondary_style, rune_names, 'Rune')} as the secondary tree versus this champion."
         )
-    if sample_win_rate < 50:
-        advice.append("Matchup sample is below 50% here; play lane safer and prioritize vision tempo.")
     if not advice:
         advice.append("Your current Karma setup is already close to this matchup recommendation.")
 
     return {
-        "source": "deeplol.gg",
-        "region": "KR",
-        "eloFilter": "DIAMOND+ (closest available to D2+)",
+        "source": source_label,
+        "region": region_label,
+        "eloFilter": elo_label,
         "dataNote": f"{data_note} Build and rune recommendations are selected by highest win rate with sample guard.",
         "champion": "Karma",
         "selectedEnemySupportId": selected_support,
@@ -1047,6 +1117,7 @@ def karma_matchup_recommendation_from_deeplol(
             "losses": max(sample_games - wins, 0),
             "winRate": sample_win_rate,
         },
+        "winrateSources": winrate_sources,
         "bestBuild": {
             "coreItemIds": build_core_ids,
             "coreItems": ids_to_names(build_core_ids, item_names, "Item"),
@@ -1730,6 +1801,7 @@ def player_summary(
     matchup_stats: dict[str, dict[str, Any]] = {}
     enemy_support_counter: Counter[int] = Counter()
     enemy_bot_counter: Counter[int] = Counter()
+    karma_recent_match_rows: list[dict[str, Any]] = []
     timeline_contexts: list[dict[str, Any]] = []
 
     for match_id in match_ids:
@@ -1842,6 +1914,53 @@ def player_summary(
             enemy_bot_name = (enemy_bot or {}).get("championName", "Unknown")
             enemy_support_id = safe_num((enemy_support or {}).get("championId"))
             enemy_bot_id = safe_num((enemy_bot or {}).get("championId"))
+            primary_perk_ids = []
+            if isinstance(styles, list) and styles and isinstance(styles[0], dict):
+                selections = styles[0].get("selections", [])
+                if isinstance(selections, list):
+                    primary_perk_ids = [safe_num((selection or {}).get("perk")) for selection in selections]
+            secondary_perk_ids = []
+            if isinstance(styles, list) and len(styles) > 1 and isinstance(styles[1], dict):
+                selections = styles[1].get("selections", [])
+                if isinstance(selections, list):
+                    secondary_perk_ids = [safe_num((selection or {}).get("perk")) for selection in selections]
+            stat_perks = perks.get("statPerks", {}) if isinstance(perks, dict) else {}
+            karma_recent_match_rows.append(
+                {
+                    "source": "riot_recent",
+                    "tier": "RECENT",
+                    "enemySupportId": enemy_support_id,
+                    "enemyBotId": enemy_bot_id,
+                    "win": 1 if win else 0,
+                    "item_core": [],
+                    "item_final": [
+                        safe_num(participant.get("item0")),
+                        safe_num(participant.get("item1")),
+                        safe_num(participant.get("item2")),
+                        safe_num(participant.get("item3")),
+                        safe_num(participant.get("item4")),
+                        safe_num(participant.get("item5")),
+                        safe_num(participant.get("item6")),
+                    ],
+                    "spell": {
+                        "spell_1": safe_num(participant.get("summoner1Id")),
+                        "spell_2": safe_num(participant.get("summoner2Id")),
+                    },
+                    "rune": {
+                        "perk_primary_style": safe_num((styles[0] or {}).get("style")) if isinstance(styles, list) and styles else 0,
+                        "perk_0": primary_perk_ids[0] if len(primary_perk_ids) > 0 else 0,
+                        "perk_1": primary_perk_ids[1] if len(primary_perk_ids) > 1 else 0,
+                        "perk_2": primary_perk_ids[2] if len(primary_perk_ids) > 2 else 0,
+                        "perk_3": primary_perk_ids[3] if len(primary_perk_ids) > 3 else 0,
+                        "perk_sub_style": safe_num((styles[1] or {}).get("style")) if isinstance(styles, list) and len(styles) > 1 else 0,
+                        "perk_4": secondary_perk_ids[0] if len(secondary_perk_ids) > 0 else 0,
+                        "perk_5": secondary_perk_ids[1] if len(secondary_perk_ids) > 1 else 0,
+                        "stat_perk_0": safe_num((stat_perks or {}).get("offense")),
+                        "stat_perk_1": safe_num((stat_perks or {}).get("flex")),
+                        "stat_perk_2": safe_num((stat_perks or {}).get("defense")),
+                    },
+                }
+            )
             matchup_key = f"{enemy_support_name}|{enemy_bot_name}"
             if matchup_key not in matchup_stats:
                 matchup_stats[matchup_key] = {
@@ -2051,6 +2170,7 @@ def player_summary(
         karma_secondary_style_counter=karma_secondary_style_counter,
         karma_secondary_keystone_counter=karma_secondary_keystone_counter,
         karma_spell_counter=karma_spell_counter,
+        karma_recent_match_rows=karma_recent_match_rows,
         diagnostics=diagnostics,
     )
 

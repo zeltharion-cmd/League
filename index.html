@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260228-10">
+  <link rel="stylesheet" href="styles.css?v=20260228-11">
 </head>
 <body>
   <canvas id="matrixRain" aria-hidden="true"></canvas>
@@ -36,6 +36,43 @@
         <button id="searchBtn" type="submit">Refresh</button>
       </form>
       <p id="statusText" class="status">Shows latest 5 matches. Matchup recommendations use Diamond+ Deeplol samples.</p>
+    </section>
+
+    <section id="dashboard" class="dashboard hidden">
+      <div class="card wide impact-score">
+        <h3>Karma Improvement Score</h3>
+        <div id="improvementScore" class="score-box">-</div>
+        <ul id="focusTargets" class="advice-list"></ul>
+      </div>
+
+      <div class="profile-card card">
+        <h2 id="playerHeading">Player</h2>
+        <div id="profileMeta" class="profile-meta"></div>
+      </div>
+
+      <div class="aggregate-grid">
+        <article class="card metric"><h3>Games</h3><p id="gamesMetric">-</p></article>
+        <article class="card metric"><h3>Win Rate</h3><p id="winRateMetric">-</p></article>
+        <article class="card metric"><h3>Avg KDA</h3><p id="kdaMetric">-</p></article>
+        <article class="card metric"><h3>Avg CS</h3><p id="csMetric">-</p></article>
+      </div>
+
+      <div class="card support-focus">
+        <h3>Support Focus</h3>
+        <div class="support-grid">
+          <article class="metric mini"><h4>Primary Role</h4><p id="supportRoleMetric">-</p></article>
+          <article class="metric mini"><h4>Support Rate</h4><p id="supportRateMetric">-</p></article>
+          <article class="metric mini"><h4>Vision / Game</h4><p id="supportVisionMetric">-</p></article>
+          <article class="metric mini"><h4>Control Wards / Game</h4><p id="supportControlMetric">-</p></article>
+          <article class="metric mini"><h4>Kill Participation</h4><p id="supportKpMetric">-</p></article>
+          <article class="metric mini"><h4>Ally Utility / Game</h4><p id="supportUtilityMetric">-</p></article>
+        </div>
+      </div>
+
+      <div class="card wide">
+        <h3>Lane Phase (First 14m)</h3>
+        <div id="laneStats" class="stack-text"></div>
+      </div>
     </section>
 
     <section class="card otp-card">
@@ -116,45 +153,7 @@
         </div>
       </div>
     </div>
-
-    <section id="dashboard" class="dashboard hidden">
-      <div class="card wide impact-score">
-        <h3>Karma Improvement Score</h3>
-        <div id="improvementScore" class="score-box">-</div>
-        <ul id="focusTargets" class="advice-list"></ul>
-      </div>
-
-      <div class="profile-card card">
-        <h2 id="playerHeading">Player</h2>
-        <div id="profileMeta" class="profile-meta"></div>
-      </div>
-
-      <div class="aggregate-grid">
-        <article class="card metric"><h3>Games</h3><p id="gamesMetric">-</p></article>
-        <article class="card metric"><h3>Win Rate</h3><p id="winRateMetric">-</p></article>
-        <article class="card metric"><h3>Avg KDA</h3><p id="kdaMetric">-</p></article>
-        <article class="card metric"><h3>Avg CS</h3><p id="csMetric">-</p></article>
-      </div>
-
-      <div class="card support-focus">
-        <h3>Support Focus</h3>
-        <div class="support-grid">
-          <article class="metric mini"><h4>Primary Role</h4><p id="supportRoleMetric">-</p></article>
-          <article class="metric mini"><h4>Support Rate</h4><p id="supportRateMetric">-</p></article>
-          <article class="metric mini"><h4>Vision / Game</h4><p id="supportVisionMetric">-</p></article>
-          <article class="metric mini"><h4>Control Wards / Game</h4><p id="supportControlMetric">-</p></article>
-          <article class="metric mini"><h4>Kill Participation</h4><p id="supportKpMetric">-</p></article>
-          <article class="metric mini"><h4>Ally Utility / Game</h4><p id="supportUtilityMetric">-</p></article>
-        </div>
-      </div>
-
-      <div class="card wide">
-        <h3>Lane Phase (First 14m)</h3>
-        <div id="laneStats" class="stack-text"></div>
-      </div>
-
-    </section>
   </main>
-  <script src="app.js?v=20260228-10"></script>
+  <script src="app.js?v=20260228-11"></script>
 </body>
 </html>
