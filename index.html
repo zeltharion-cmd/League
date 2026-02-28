@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260228-4">
 </head>
 <body>
   <main class="shell">
@@ -17,8 +17,8 @@
         <button id="customizeBtn" type="button" class="customize-btn">Customize</button>
       </div>
       <h1>Karma Kommand Kenter</h1>
-      <p class="subtitle">Summoner's Rift command board focused on your Karma setup and the highest-winrate response to the current enemy botlane.</p>
-      <p id="setupHeadline" class="setup-headline">Loading your Karma setup...</p>
+      <p class="subtitle">Summoner's Rift command board focused on the highest-winrate Karma response to the current enemy botlane.</p>
+      <p id="setupHeadline" class="setup-headline">Loading best matchup recommendation...</p>
     </header>
 
     <section class="search-card">
@@ -54,12 +54,6 @@
       </div>
       <div class="otp-grid">
         <article class="mini otp-block">
-          <h4>Your Karma Setup (Priority)</h4>
-          <div id="yourBuild" class="stack-text">Loading...</div>
-          <div id="yourBuildIcons" class="icon-row"></div>
-          <button id="yourRunesBtn" type="button" class="rune-btn">Open Your Runes</button>
-        </article>
-        <article class="mini otp-block">
           <h4>Best Build Vs Current Botlane</h4>
           <div id="matchupBuild" class="stack-text">Loading...</div>
           <div id="matchupBuildIcons" class="icon-row"></div>
@@ -70,7 +64,7 @@
           <div id="matchupMeta" class="stack-text">Loading...</div>
         </article>
         <article class="mini otp-block">
-          <h4>What To Change</h4>
+          <h4>Execution Notes</h4>
           <ul id="matchupAdvice" class="advice-list">
             <li>Loading...</li>
           </ul>
@@ -203,6 +197,6 @@
       </div>
     </section>
   </main>
-  <script src="app.js"></script>
+  <script src="app.js?v=20260228-4"></script>
 </body>
 </html>

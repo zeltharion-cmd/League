@@ -125,6 +125,11 @@ body::after {
     linear-gradient(0deg, rgba(200, 164, 97, 0.14), transparent 20%);
 }
 
+.hero > * {
+  position: relative;
+  z-index: 1;
+}
+
 .hero h1 {
   margin: 0.2rem 0 0.35rem;
   font-family: "Cinzel", serif;
@@ -182,6 +187,7 @@ body::after {
   color: var(--ink);
   font: inherit;
   padding: 0.45rem 0.64rem;
+  color-scheme: dark;
 }
 
 .search-form input:focus,
@@ -190,6 +196,29 @@ body::after {
   outline: none;
   border-color: rgba(200, 164, 97, 0.72);
   box-shadow: 0 0 0 2px rgba(200, 164, 97, 0.18);
+}
+
+#regionSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  min-width: 102px;
+  border: 1px solid rgba(78, 184, 230, 0.45);
+  background:
+    linear-gradient(180deg, rgba(16, 40, 67, 0.95), rgba(10, 27, 46, 0.96)),
+    linear-gradient(45deg, transparent 50%, #8fcdeb 50%),
+    linear-gradient(135deg, #8fcdeb 50%, transparent 50%);
+  background-repeat: no-repeat;
+  background-size: auto, 8px 8px, 8px 8px;
+  background-position: center, calc(100% - 16px) 52%, calc(100% - 10px) 52%;
+  color: #ebf7ff;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding-right: 2rem;
+}
+
+#regionSelect:hover {
+  border-color: rgba(200, 164, 97, 0.7);
 }
 
 #enemySupportSelect,
@@ -221,6 +250,20 @@ body::after {
   opacity: 0.72;
 }
 
+#regionSelect option,
+#enemySupportSelect option,
+#enemyBotSelect option {
+  background: #0e2136;
+  color: #f1f7ff;
+}
+
+#regionSelect option:checked,
+#enemySupportSelect option:checked,
+#enemyBotSelect option:checked {
+  background: #1e4f86;
+  color: #fff2d2;
+}
+
 #searchBtn {
   min-height: 2.35rem;
   border-radius: 8px;
@@ -246,8 +289,7 @@ body::after {
 }
 
 #gameNameInput,
-#tagLineInput,
-#regionSelect {
+#tagLineInput {
   background: linear-gradient(180deg, #122033, #101d31);
   color: #e8f4ff;
   font-weight: 700;
@@ -796,7 +838,7 @@ body.rain-off::after {
   color: #d8ebf6;
 }
 
-.color-grid input[type=\"color\"] {
+.color-grid input[type="color"] {
   width: 100%;
   height: 36px;
   border: 1px solid rgba(65, 165, 211, 0.34);

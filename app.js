@@ -15,13 +15,10 @@ const enemySupportSelectEl = document.getElementById("enemySupportSelect");
 const enemyBotSelectEl = document.getElementById("enemyBotSelect");
 
 const matchupBuildEl = document.getElementById("matchupBuild");
-const yourBuildEl = document.getElementById("yourBuild");
 const matchupBuildIconsEl = document.getElementById("matchupBuildIcons");
-const yourBuildIconsEl = document.getElementById("yourBuildIcons");
 const matchupMetaEl = document.getElementById("matchupMeta");
 const matchupAdviceEl = document.getElementById("matchupAdvice");
 const matchupRunesBtnEl = document.getElementById("matchupRunesBtn");
-const yourRunesBtnEl = document.getElementById("yourRunesBtn");
 
 const runesModalEl = document.getElementById("runesModal");
 const closeRunesModalEl = document.getElementById("closeRunesModal");
@@ -118,19 +115,32 @@ let selectedEnemyBotId = 0;
 let supportOptionsAll = [];
 let botOptionsAll = [];
 let matchupRunesCache = {};
-let yourRunesCache = {};
 
 function safeNum(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 }
 
+function setText(el, value) {
+  if (!el) {
+    return;
+  }
+  el.textContent = value == null ? "" : String(value);
+}
+
+function setHtml(el, value) {
+  if (!el) {
+    return;
+  }
+  el.innerHTML = value == null ? "" : String(value);
+}
+
 function setStatus(message) {
-  statusTextEl.textContent = message;
+  setText(statusTextEl, message);
 }
 
 function setMatchupStatus(message) {
-  matchupStatusEl.textContent = message;
+  setText(matchupStatusEl, message);
 }
 
 function line(label, value) {
@@ -174,14 +184,18 @@ function runeSection(title, entries) {
   );
 }
 
-function openRunesModal(type) {
-  const isMatchup = type === "matchup";
-  const runes = isMatchup ? matchupRunesCache : yourRunesCache;
-  runesTitleEl.textContent = isMatchup ? "High Elo Matchup Rune Page" : "Your Rune Page";
-  runesBodyEl.innerHTML =
+function openRunesModal() {
+  if (!runesTitleEl || !runesBodyEl || !runesModalEl) {
+    return;
+  }
+  const runes = matchupRunesCache;
+  setText(runesTitleEl, "Recommended Matchup Rune Page");
+  setHtml(
+    runesBodyEl,
     runeSection("Primary", runes.primary || []) +
     runeSection("Secondary", runes.secondary || []) +
-    runeSection("Shards", runes.shards || []);
+    runeSection("Shards", runes.shards || [])
+  );
   runesModalEl.classList.remove("hidden");
 }
 
@@ -191,7 +205,9 @@ function applyRainEnabled(enabled) {
   } else {
     document.body.classList.add("rain-off");
   }
-  rainToggleEl.checked = enabled;
+  if (rainToggleEl) {
+    rainToggleEl.checked = enabled;
+  }
   localStorage.setItem(RAIN_STORAGE_KEY, enabled ? "1" : "0");
 }
 
@@ -245,9 +261,15 @@ function loadSavedThemeVars() {
 }
 
 function buildPresetButtons() {
-  presetGridEl.innerHTML = PRESET_THEMES
+  if (!presetGridEl) {
+    return;
+  }
+  setHtml(
+    presetGridEl,
+    PRESET_THEMES
     .map((preset, idx) => `<button type="button" class="preset-btn" data-preset-index="${idx}">${preset.name}</button>`)
-    .join("");
+    .join("")
+  );
   for (const button of presetGridEl.querySelectorAll(".preset-btn")) {
     button.addEventListener("click", () => {
       const index = safeNum(button.getAttribute("data-preset-index"));
@@ -260,6 +282,9 @@ function buildPresetButtons() {
 }
 
 function initThemeControls() {
+  if (!customizeBtnEl || !customizeModalEl || !closeCustomizeModalEl || !applyThemeBtnEl || !resetThemeBtnEl) {
+    return;
+  }
   buildPresetButtons();
 
   const savedTheme = loadSavedThemeVars();
@@ -271,7 +296,8 @@ function initThemeControls() {
   const rainSaved = localStorage.getItem(RAIN_STORAGE_KEY);
   applyRainEnabled(rainSaved !== "0");
 
-  customizeBtnEl.addEventListener("click", () => {
+  customizeBtnEl.addEventListener("click", (event) => {
+    event.preventDefault();
     customizeModalEl.classList.remove("hidden");
   });
 
@@ -285,9 +311,11 @@ function initThemeControls() {
     }
   });
 
-  rainToggleEl.addEventListener("change", () => {
-    applyRainEnabled(Boolean(rainToggleEl.checked));
-  });
+  if (rainToggleEl) {
+    rainToggleEl.addEventListener("change", () => {
+      applyRainEnabled(Boolean(rainToggleEl.checked));
+    });
+  }
 
   applyThemeBtnEl.addEventListener("click", () => {
     const values = {};
@@ -309,12 +337,16 @@ function initThemeControls() {
 }
 
 function renderChampionSelect(selectEl, options, selected, placeholder) {
+  if (!selectEl) {
+    return;
+  }
   if (!Array.isArray(options) || !options.length) {
-    selectEl.innerHTML = `<option value="0">No champions</option>`;
+    setHtml(selectEl, `<option value="0">No champions</option>`);
     selectEl.disabled = true;
     return;
   }
-  selectEl.innerHTML =
+  setHtml(
+    selectEl,
     `<option value="0">${placeholder}</option>` +
     options
       .map((option) => {
@@ -322,7 +354,8 @@ function renderChampionSelect(selectEl, options, selected, placeholder) {
         const selectedAttr = id === selected ? " selected" : "";
         return `<option value="${id}"${selectedAttr}>${option.name || `Champion ${id}`}</option>`;
       })
-      .join("");
+      .join("")
+  );
   selectEl.disabled = false;
 }
 
@@ -335,8 +368,8 @@ function filterChampionOptions(options, searchText) {
 }
 
 function renderMatchupFilters() {
-  const supportOptions = filterChampionOptions(supportOptionsAll, enemySupportSearchEl.value);
-  const botOptions = filterChampionOptions(botOptionsAll, enemyBotSearchEl.value);
+  const supportOptions = filterChampionOptions(supportOptionsAll, enemySupportSearchEl?.value || "");
+  const botOptions = filterChampionOptions(botOptionsAll, enemyBotSearchEl?.value || "");
   renderChampionSelect(enemySupportSelectEl, supportOptions, selectedEnemySupportId, "Select enemy support");
   renderChampionSelect(enemyBotSelectEl, botOptions, selectedEnemyBotId, "Select enemy bot carry");
 }
@@ -347,27 +380,31 @@ function renderDashboard(payload) {
   const support = payload.supportInsights || {};
   const matches = Array.isArray(payload.recentMatches) ? payload.recentMatches : [];
 
-  playerHeadingEl.textContent = `${player.gameName || "feelsbanman"} #${player.tagLine || "EUW"}`;
-  profileMetaEl.innerHTML =
-    `<div>Region: <strong>${String(regionSelectEl.value || "euw1").toUpperCase()}</strong></div>` +
+  setText(playerHeadingEl, `${player.gameName || "feelsbanman"} #${player.tagLine || "EUW"}`);
+  setHtml(
+    profileMetaEl,
+    `<div>Region: <strong>${String(regionSelectEl?.value || "euw1").toUpperCase()}</strong></div>` +
     `<div>Summoner Level: <strong>${safeNum(player.summonerLevel)}</strong></div>` +
-    `<div>Profile Icon ID: <strong>${safeNum(player.profileIconId)}</strong></div>`;
+    `<div>Profile Icon ID: <strong>${safeNum(player.profileIconId)}</strong></div>`
+  );
 
-  gamesMetricEl.textContent = safeNum(aggregate.games);
-  winRateMetricEl.textContent = `${safeNum(aggregate.winRate).toFixed(1)}%`;
-  kdaMetricEl.textContent = safeNum(aggregate.avgKda).toFixed(2);
-  csMetricEl.textContent = safeNum(aggregate.avgCs).toFixed(1);
-  supportRoleMetricEl.textContent = String(support.primaryRole || "UNKNOWN").replace("UTILITY", "SUPPORT");
-  supportRateMetricEl.textContent = `${safeNum(support.supportRate).toFixed(1)}%`;
-  supportVisionMetricEl.textContent = safeNum(support.avgVisionScore).toFixed(1);
-  supportControlMetricEl.textContent = safeNum(support.avgControlWards).toFixed(1);
-  supportKpMetricEl.textContent = `${safeNum(support.avgKillParticipation).toFixed(1)}%`;
-  supportUtilityMetricEl.textContent = safeNum(support.avgAllyUtility).toLocaleString();
+  setText(gamesMetricEl, safeNum(aggregate.games));
+  setText(winRateMetricEl, `${safeNum(aggregate.winRate).toFixed(1)}%`);
+  setText(kdaMetricEl, safeNum(aggregate.avgKda).toFixed(2));
+  setText(csMetricEl, safeNum(aggregate.avgCs).toFixed(1));
+  setText(supportRoleMetricEl, String(support.primaryRole || "UNKNOWN").replace("UTILITY", "SUPPORT"));
+  setText(supportRateMetricEl, `${safeNum(support.supportRate).toFixed(1)}%`);
+  setText(supportVisionMetricEl, safeNum(support.avgVisionScore).toFixed(1));
+  setText(supportControlMetricEl, safeNum(support.avgControlWards).toFixed(1));
+  setText(supportKpMetricEl, `${safeNum(support.avgKillParticipation).toFixed(1)}%`);
+  setText(supportUtilityMetricEl, safeNum(support.avgAllyUtility).toLocaleString());
 
   if (!matches.length) {
-    matchesBodyEl.innerHTML = `<tr><td colspan="12">No recent matches found.</td></tr>`;
+    setHtml(matchesBodyEl, `<tr><td colspan="12">No recent matches found.</td></tr>`);
   } else {
-    matchesBodyEl.innerHTML = matches
+    setHtml(
+      matchesBodyEl,
+      matches
       .map((match) => {
         const win = match.result === "Win";
         const role = String(match.role || "UNKNOWN").replace("UTILITY", "SUPPORT");
@@ -388,10 +425,13 @@ function renderDashboard(payload) {
           "</tr>"
         );
       })
-      .join("");
+      .join("")
+    );
   }
 
-  dashboardEl.classList.remove("hidden");
+  if (dashboardEl) {
+    dashboardEl.classList.remove("hidden");
+  }
 }
 
 function renderHighEloMatchup(payload) {
@@ -409,31 +449,24 @@ function renderHighEloMatchup(payload) {
 
   const bestBuild = data.bestBuild || {};
   const bestRunes = data.bestRunes || {};
-  const your = data.you || {};
-  const yourRunes = your.runes || {};
   const aggregate = data.aggregate || {};
-  const comparison = data.comparison || {};
   const advice = Array.isArray(data.advice) ? data.advice : [];
 
   if (data.error) {
-    matchupBuildEl.innerHTML = line("Status", data.error) + line("Detail", data.detail || "No detail");
-    matchupBuildIconsEl.innerHTML = "";
-    yourBuildEl.innerHTML = line("Your Setup", "Unavailable");
-    yourBuildIconsEl.innerHTML = "";
-    matchupMetaEl.innerHTML = line("Filter", "Diamond+") + line("Sample", "0 games");
-    matchupAdviceEl.innerHTML = "<li>Retry after refresh.</li>";
+    setHtml(matchupBuildEl, line("Status", data.error) + line("Detail", data.detail || "No detail"));
+    setHtml(matchupBuildIconsEl, "");
+    setHtml(matchupMetaEl, line("Filter", "Diamond+") + line("Sample", "0 games"));
+    setHtml(matchupAdviceEl, "<li>Retry after refresh.</li>");
     setMatchupStatus(data.error);
-    setupHeadlineEl.textContent = "Unable to load your Karma setup right now.";
+    setText(setupHeadlineEl, "Unable to load matchup recommendation right now.");
     return;
   }
 
   const matchupCore = Array.isArray(bestBuild.coreItems) ? bestBuild.coreItems.join(" -> ") : "-";
   const matchupSpells = Array.isArray(bestBuild.summonerSpells) ? bestBuild.summonerSpells.join(" + ") : "-";
-  const yourCore = Array.isArray(your.coreItems) ? your.coreItems.join(" -> ") : "-";
-  const yourSpells = Array.isArray(your.summonerSpells) ? your.summonerSpells.join(" + ") : "-";
-  const missingCore = Array.isArray(comparison.missingFromYourCore) ? comparison.missingFromYourCore.join(", ") : "-";
 
-  matchupBuildEl.innerHTML =
+  setHtml(
+    matchupBuildEl,
     line("Enemy Support", data.selectedEnemySupport || "-") +
     line("Enemy Bot", data.selectedEnemyBot || "-") +
     line("Sample", `${safeNum(data.sampleMatches)} games (${safeNum(aggregate.winRate).toFixed(1)}% WR)`) +
@@ -442,42 +475,32 @@ function renderHighEloMatchup(payload) {
     line("Spells", matchupSpells || "-") +
     line("Keystone", bestRunes.keystone || "-") +
     line("Primary Tree", bestRunes.primaryStyle || "-") +
-    line("Secondary Tree", bestRunes.secondaryStyle || "-");
+    line("Secondary Tree", bestRunes.secondaryStyle || "-")
+  );
 
   const matchupIcons = [
     ...(Array.isArray(bestBuild.coreItemsDetailed) ? bestBuild.coreItemsDetailed : []),
     ...(Array.isArray(bestBuild.bootsDetailed) ? bestBuild.bootsDetailed : []),
     ...(Array.isArray(bestBuild.summonerSpellsDetailed) ? bestBuild.summonerSpellsDetailed : []),
   ];
-  matchupBuildIconsEl.innerHTML = renderIconRow(matchupIcons);
+  setHtml(matchupBuildIconsEl, renderIconRow(matchupIcons));
 
-  yourBuildEl.innerHTML =
-    line("Your Karma Sample", `${safeNum(your.karmaGames)} games (${safeNum(your.karmaWinRate).toFixed(1)}% WR)`) +
-    line("Core Build", yourCore || "-") +
-    line("Boots", your.boots || "-") +
-    line("Spells", yourSpells || "-") +
-    line("Keystone", yourRunes.keystone || "-") +
-    line("Primary Tree", yourRunes.primaryStyle || "-") +
-    line("Secondary Tree", yourRunes.secondaryStyle || "-") +
-    line("Missing vs High WR", missingCore || "-");
-
-  const yourIcons = [
-    ...(Array.isArray(your.coreItemsDetailed) ? your.coreItemsDetailed : []),
-    ...(Array.isArray(your.bootsDetailed) ? your.bootsDetailed : []),
-    ...(Array.isArray(your.summonerSpellsDetailed) ? your.summonerSpellsDetailed : []),
-  ];
-  yourBuildIconsEl.innerHTML = renderIconRow(yourIcons);
-
-  matchupMetaEl.innerHTML =
+  setHtml(
+    matchupMetaEl,
     line("Source", `${data.source || "Deeplol"} (${data.region || "KR"})`) +
     line("Elo Filter", data.eloFilter || "DIAMOND+") +
     line("Build WR", `${safeNum(bestBuild.winRate).toFixed(1)}% in ${safeNum(bestBuild.games)} games`) +
     line("Rune WR", `${safeNum(bestRunes.winRate).toFixed(1)}% in ${safeNum(bestRunes.games)} games`) +
-    line("Data Note", data.dataNote || "");
+    line("Data Note", data.dataNote || "")
+  );
 
-  matchupAdviceEl.innerHTML = advice.length
-    ? advice.map((entry) => `<li>${entry}</li>`).join("")
-    : "<li>No urgent changes detected for this matchup pair.</li>";
+  const filteredAdvice = advice.filter((entry) => !/\b(your|you)\b/i.test(String(entry || "")));
+  setHtml(
+    matchupAdviceEl,
+    filteredAdvice.length
+      ? filteredAdvice.map((entry) => `<li>${entry}</li>`).join("")
+      : "<li>Use the recommended core and rune page for this enemy botlane.</li>"
+  );
 
   matchupRunesCache = {
     primary: [
@@ -488,18 +511,11 @@ function renderHighEloMatchup(payload) {
     shards: Array.isArray(bestRunes.statShardsDetailed) ? bestRunes.statShardsDetailed : [],
   };
 
-  yourRunesCache = {
-    primary: [
-      ...(Array.isArray(yourRunes.keystoneDetailed) ? yourRunes.keystoneDetailed : []),
-      ...(Array.isArray(yourRunes.primaryRunesDetailed) ? yourRunes.primaryRunesDetailed : []),
-    ],
-    secondary: Array.isArray(yourRunes.secondaryRunesDetailed) ? yourRunes.secondaryRunesDetailed : [],
-    shards: Array.isArray(yourRunes.statShardsDetailed) ? yourRunes.statShardsDetailed : [],
-  };
-
-  setupHeadlineEl.textContent =
-    `Your Karma setup: ${yourCore || "-"} (${yourRunes.keystone || "No keystone"}). ` +
-    `Best vs ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}: ${matchupCore || "-"}.`;
+  setText(
+    setupHeadlineEl,
+    `Best Karma setup vs ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}: ` +
+    `${matchupCore || "-"} (${bestRunes.keystone || "No keystone"}).`
+  );
 
   setMatchupStatus(
     `Loaded highest-winrate Diamond+ matchup model: ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}.`
@@ -513,24 +529,33 @@ function renderKarmaInsights(payload) {
   const matchups = Array.isArray(insights.matchups) ? insights.matchups : [];
   const focus = Array.isArray(score.focusTargets) ? score.focusTargets : [];
 
-  improvementScoreEl.innerHTML =
+  setHtml(
+    improvementScoreEl,
     `<div class="score-main">${safeNum(score.score)} <small>${score.grade || "-"}</small></div>` +
-    `<div class="score-sub">Your support impact score. Push this up by closing the target gaps below.</div>`;
-  focusTargetsEl.innerHTML = focus.length
-    ? focus.map((entry) => `<li>${entry}</li>`).join("")
-    : "<li>No urgent target gaps detected.</li>";
+    `<div class="score-sub">Your support impact score. Push this up by closing the target gaps below.</div>`
+  );
+  setHtml(
+    focusTargetsEl,
+    focus.length
+      ? focus.map((entry) => `<li>${entry}</li>`).join("")
+      : "<li>No urgent target gaps detected.</li>"
+  );
 
-  laneStatsEl.innerHTML =
+  setHtml(
+    laneStatsEl,
     line("Gold Diff @14", safeNum(lane.avgGoldDiff14).toFixed(1)) +
     line("XP Diff @14", safeNum(lane.avgXpDiff14).toFixed(1)) +
     line("Assists before 14", safeNum(lane.avgAssistsBefore14).toFixed(2)) +
     line("Deaths before 14", safeNum(lane.avgDeathsBefore14).toFixed(2)) +
-    line("First death minute", safeNum(lane.avgFirstDeathMin).toFixed(2));
+    line("First death minute", safeNum(lane.avgFirstDeathMin).toFixed(2))
+  );
 
   if (!matchups.length) {
-    matchupBodyEl.innerHTML = `<tr><td colspan="7">No matchup data yet.</td></tr>`;
+    setHtml(matchupBodyEl, `<tr><td colspan="7">No matchup data yet.</td></tr>`);
   } else {
-    matchupBodyEl.innerHTML = matchups
+    setHtml(
+      matchupBodyEl,
+      matchups
       .map((row) => (
         "<tr>" +
         `<td>${row.enemySupport || "-"}</td>` +
@@ -542,15 +567,16 @@ function renderKarmaInsights(payload) {
         `<td>${safeNum(row.avgVisionPerMin).toFixed(2)}</td>` +
         "</tr>"
       ))
-      .join("");
+      .join("")
+    );
   }
 }
 
 async function fetchStats() {
   const query = new URLSearchParams();
-  query.set("game_name", gameNameInputEl.value.trim() || "feelsbanman");
-  query.set("tag_line", tagLineInputEl.value.trim() || "EUW");
-  query.set("platform", regionSelectEl.value || "euw1");
+  query.set("game_name", gameNameInputEl?.value?.trim() || "feelsbanman");
+  query.set("tag_line", tagLineInputEl?.value?.trim() || "EUW");
+  query.set("platform", regionSelectEl?.value || "euw1");
 
   if (selectedEnemySupportId > 0) {
     query.set("enemy_support_id", String(selectedEnemySupportId));
@@ -578,13 +604,19 @@ async function fetchStats() {
 }
 
 async function refreshStats() {
-  searchBtnEl.disabled = true;
-  enemySupportSelectEl.disabled = true;
-  enemyBotSelectEl.disabled = true;
+  if (searchBtnEl) {
+    searchBtnEl.disabled = true;
+  }
+  if (enemySupportSelectEl) {
+    enemySupportSelectEl.disabled = true;
+  }
+  if (enemyBotSelectEl) {
+    enemyBotSelectEl.disabled = true;
+  }
 
-  const gameName = gameNameInputEl.value.trim() || "feelsbanman";
-  const tagLine = tagLineInputEl.value.trim() || "EUW";
-  const platform = (regionSelectEl.value || "euw1").toUpperCase();
+  const gameName = gameNameInputEl?.value?.trim() || "feelsbanman";
+  const tagLine = tagLineInputEl?.value?.trim() || "EUW";
+  const platform = (regionSelectEl?.value || "euw1").toUpperCase();
 
   setStatus(`Loading ${gameName}#${tagLine} on ${platform}...`);
   setMatchupStatus("Loading Diamond+ matchup recommendations...");
@@ -604,57 +636,81 @@ async function refreshStats() {
       `Loaded latest 5 ${platform} matches for ${gameName}#${tagLine}. High-winrate matchup model loaded for ${support} + ${bot}.`
     );
   } catch (error) {
-    dashboardEl.classList.add("hidden");
+    if (dashboardEl) {
+      dashboardEl.classList.add("hidden");
+    }
     setStatus(error.message || "Failed to load stats.");
     setMatchupStatus("Matchup model unavailable.");
-    setupHeadlineEl.textContent = "Unable to load your Karma setup right now.";
+    setText(setupHeadlineEl, "Unable to load matchup recommendation right now.");
   } finally {
-    searchBtnEl.disabled = false;
+    if (searchBtnEl) {
+      searchBtnEl.disabled = false;
+    }
   }
 }
 
-enemySupportSearchEl.addEventListener("input", () => {
-  renderMatchupFilters();
-});
+if (enemySupportSearchEl) {
+  enemySupportSearchEl.addEventListener("input", () => {
+    renderMatchupFilters();
+  });
+}
 
-enemyBotSearchEl.addEventListener("input", () => {
-  renderMatchupFilters();
-});
+if (enemyBotSearchEl) {
+  enemyBotSearchEl.addEventListener("input", () => {
+    renderMatchupFilters();
+  });
+}
 
-enemySupportSelectEl.addEventListener("change", async () => {
-  selectedEnemySupportId = safeNum(enemySupportSelectEl.value);
-  await refreshStats();
-});
+if (enemySupportSelectEl) {
+  enemySupportSelectEl.addEventListener("change", async () => {
+    selectedEnemySupportId = safeNum(enemySupportSelectEl.value);
+    await refreshStats();
+  });
+}
 
-enemyBotSelectEl.addEventListener("change", async () => {
-  selectedEnemyBotId = safeNum(enemyBotSelectEl.value);
-  await refreshStats();
-});
+if (enemyBotSelectEl) {
+  enemyBotSelectEl.addEventListener("change", async () => {
+    selectedEnemyBotId = safeNum(enemyBotSelectEl.value);
+    await refreshStats();
+  });
+}
 
-matchupRunesBtnEl.addEventListener("click", () => {
-  openRunesModal("matchup");
-});
+if (matchupRunesBtnEl) {
+  matchupRunesBtnEl.addEventListener("click", () => {
+    openRunesModal();
+  });
+}
 
-yourRunesBtnEl.addEventListener("click", () => {
-  openRunesModal("you");
-});
-
-closeRunesModalEl.addEventListener("click", () => {
-  runesModalEl.classList.add("hidden");
-});
-
-runesModalEl.addEventListener("click", (event) => {
-  if (event.target === runesModalEl) {
+if (closeRunesModalEl && runesModalEl) {
+  closeRunesModalEl.addEventListener("click", () => {
     runesModalEl.classList.add("hidden");
-  }
-});
+  });
+}
 
-searchFormEl.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  selectedEnemySupportId = 0;
-  selectedEnemyBotId = 0;
-  await refreshStats();
-});
+if (runesModalEl) {
+  runesModalEl.addEventListener("click", (event) => {
+    if (event.target === runesModalEl) {
+      runesModalEl.classList.add("hidden");
+    }
+  });
+}
 
-initThemeControls();
-void refreshStats();
+if (searchFormEl) {
+  searchFormEl.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    selectedEnemySupportId = 0;
+    selectedEnemyBotId = 0;
+    await refreshStats();
+  });
+}
+
+function boot() {
+  initThemeControls();
+  void refreshStats();
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", boot, { once: true });
+} else {
+  boot();
+}
