@@ -358,6 +358,33 @@ body::after {
   gap: 0.4rem;
 }
 
+.enemy-pair {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.enemy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: linear-gradient(170deg, rgba(30, 30, 30, 0.9), rgba(12, 12, 12, 0.95));
+  border-radius: 999px;
+  padding: 0.16rem 0.46rem 0.16rem 0.18rem;
+  font-size: 0.78rem;
+  color: var(--ink);
+}
+
+.enemy-chip img {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  background: #0f0f0f;
+}
+
 .icon-chip {
   width: 58px;
   text-align: center;

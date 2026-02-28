@@ -4,6 +4,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import Counter
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -19,13 +20,19 @@ LOCKED_GAME_NAME = "feelsbanman"
 LOCKED_TAG_LINE = "EUW"
 KARMA_CHAMPION_ID = 43
 DISPLAY_MATCH_COUNT_FIXED = 5
-KARMA_SETUP_MATCH_COUNT = 30
+KARMA_SETUP_MATCH_COUNT = 15
 MATCHUP_SETUP_MATCH_COUNT = 60
 MATCHUP_PAGE_SIZE = 10
 MATCHUP_PLAYER_TYPE = "all"
 DEEPL0L_API_BASE = "https://b2c-api-cdn.deeplol.gg"
 STATIC_CACHE_SECONDS = 6 * 60 * 60
 DEEPL0L_CACHE_SECONDS = 5 * 60
+PLAYER_SUMMARY_CACHE_SECONDS = 45
+try:
+    RIOT_PARALLEL_WORKERS = max(2, int(os.environ.get("RIOT_FETCH_WORKERS", "6")))
+except ValueError:
+    RIOT_PARALLEL_WORKERS = 6
+TIMELINE_ENABLED_DEFAULT = os.environ.get("TIMELINE_ENABLED_DEFAULT", "0").strip() == "1"
 HIGH_LEVEL_TARGETS = {
     "kp": 65.0,
     "deaths": 4.5,
@@ -61,6 +68,7 @@ DEEPL0L_KARMA_CACHE: dict[str, Any] = {
     "builds": {},
     "matchup_rows": {},
 }
+PLAYER_SUMMARY_CACHE: dict[str, Any] = {}
 
 # Platform regions (game shard) to regional routing values for Match-v5/Account-v1.
 PLATFORM_TO_ROUTING = {
@@ -180,6 +188,84 @@ def safe_int_text(value: str) -> int:
         return int(str(value).replace(",", "").strip())
     except (TypeError, ValueError):
         return 0
+
+
+def is_truthy_text(value: str) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def get_player_summary_cache(cache_key: str) -> dict[str, Any] | None:
+    now = int(time.time())
+    entry = PLAYER_SUMMARY_CACHE.get(cache_key)
+    if not isinstance(entry, dict):
+        return None
+    fetched_at = safe_int_text(entry.get("fetched_at", 0))
+    if fetched_at <= 0 or (now - fetched_at) > PLAYER_SUMMARY_CACHE_SECONDS:
+        PLAYER_SUMMARY_CACHE.pop(cache_key, None)
+        return None
+    payload = entry.get("payload")
+    return payload if isinstance(payload, dict) else None
+
+
+def set_player_summary_cache(cache_key: str, payload: dict[str, Any]) -> None:
+    PLAYER_SUMMARY_CACHE[cache_key] = {
+        "fetched_at": int(time.time()),
+        "payload": payload,
+    }
+
+    # Opportunistic cleanup to prevent unbounded growth.
+    stale_keys: list[str] = []
+    now = int(time.time())
+    for key, entry in PLAYER_SUMMARY_CACHE.items():
+        fetched_at = safe_int_text((entry or {}).get("fetched_at", 0))
+        if fetched_at <= 0 or (now - fetched_at) > PLAYER_SUMMARY_CACHE_SECONDS:
+            stale_keys.append(key)
+    for key in stale_keys:
+        PLAYER_SUMMARY_CACHE.pop(key, None)
+
+
+def parallel_riot_fetch_json(
+    *,
+    requests: list[tuple[str, str, str]],
+    api_key: str,
+    diagnostics: list[dict[str, Any]],
+    fallback: Any,
+    max_workers: int,
+) -> dict[str, Any]:
+    if not requests:
+        return {}
+
+    results: dict[str, Any] = {}
+    worker_count = max(1, min(max_workers, len(requests)))
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        future_map = {
+            executor.submit(riot_get_json, url, api_key, endpoint): (request_id, endpoint, url)
+            for request_id, url, endpoint in requests
+        }
+        for future in as_completed(future_map):
+            request_id, endpoint, url = future_map[future]
+            try:
+                results[request_id] = future.result()
+            except RiotApiError as exc:
+                diagnostics.append(
+                    {
+                        "endpoint": endpoint,
+                        "status": exc.status,
+                        "detail": exc.detail[:180],
+                    }
+                )
+                results[request_id] = fallback
+            except Exception as exc:
+                diagnostics.append(
+                    {
+                        "endpoint": endpoint,
+                        "status": 0,
+                        "detail": f"{type(exc).__name__}: {str(exc)[:150]}",
+                        "url": url[:120],
+                    }
+                )
+                results[request_id] = fallback
+    return results
 
 
 def is_support_role(role: str) -> bool:
@@ -557,6 +643,8 @@ def karma_matchup_recommendation_from_deeplol(
     karma_spell_counter: Counter[tuple[int, int]],
     diagnostics: list[dict[str, Any]],
 ) -> dict[str, Any]:
+    minimum_recommend_win_rate = 50.0
+
     def is_diamond_plus(tier_name: str) -> bool:
         tier = str(tier_name or "").upper()
         return tier in {"DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"}
@@ -862,6 +950,12 @@ def karma_matchup_recommendation_from_deeplol(
     sample_win_rate = round((wins * 100 / sample_games), 1) if sample_games else 0.0
     selected_build_key, build_wr, build_games = choose_best_setup(build_stats, sample_count=sample_games)
     selected_rune_key, rune_wr, rune_games = choose_best_setup(rune_stats, sample_count=sample_games)
+    recommendation_available = bool(
+        build_games > 0
+        and rune_games > 0
+        and build_wr >= minimum_recommend_win_rate
+        and rune_wr >= minimum_recommend_win_rate
+    )
 
     build_core_ids = list(selected_build_key[0]) if selected_build_key else []
     build_boots_id = safe_num(selected_build_key[1]) if selected_build_key else 0
@@ -881,6 +975,40 @@ def karma_matchup_recommendation_from_deeplol(
     missing_from_your_core = [item_id for item_id in build_core_ids if item_id not in your_core_ids]
     extra_in_your_core = [item_id for item_id in your_core_ids if item_id not in build_core_ids]
     advice: list[str] = []
+    if not recommendation_available:
+        return {
+            "source": "deeplol.gg",
+            "region": "KR",
+            "eloFilter": "DIAMOND+ (closest available to D2+)",
+            "dataNote": (
+                f"{data_note} Recommendation floor enabled: only show build/runes with >= "
+                f"{minimum_recommend_win_rate:.0f}% win rate."
+            ),
+            "champion": "Karma",
+            "selectedEnemySupportId": selected_support,
+            "selectedEnemyBotId": selected_bot,
+            "selectedEnemySupport": champion_names.get(selected_support, "Unknown"),
+            "selectedEnemyBot": champion_names.get(selected_bot, "Unknown"),
+            "championOptions": champion_options,
+            "supportChampionOptions": support_options,
+            "botChampionOptions": bot_options,
+            "sampleMatches": sample_games,
+            "aggregate": {
+                "wins": wins,
+                "losses": max(sample_games - wins, 0),
+                "winRate": sample_win_rate,
+            },
+            "bestBuild": {},
+            "bestRunes": {},
+            "you": {},
+            "comparison": {},
+            "recommendationAvailable": False,
+            "advice": [
+                f"No Diamond+ recommendation met the {minimum_recommend_win_rate:.0f}% win rate floor.",
+                "Pick a different enemy support/bot pair or wait for more sample data.",
+            ],
+        }
+
     if sample_games < 8:
         advice.append("Low sample size for this matchup; treat build suggestions as directional.")
     if missing_from_your_core:
@@ -965,6 +1093,7 @@ def karma_matchup_recommendation_from_deeplol(
                 and selected_secondary_style == your_secondary_style_id
             ),
         },
+        "recommendationAvailable": True,
         "advice": advice,
     }
 
@@ -1493,6 +1622,7 @@ def player_summary(
     selected_enemy_support_id: int,
     selected_enemy_bot_id: int,
     debug_mode: bool = False,
+    include_timeline: bool = TIMELINE_ENABLED_DEFAULT,
 ) -> dict[str, Any]:
     routing = PLATFORM_TO_ROUTING.get(platform)
     if not routing:
@@ -1541,6 +1671,25 @@ def player_summary(
         fallback=[],
         diagnostics=diagnostics,
     )
+    if not isinstance(match_ids, list):
+        match_ids = []
+    match_ids = [str(match_id).strip() for match_id in match_ids if str(match_id).strip()]
+
+    match_requests = [
+        (
+            match_id,
+            f"https://{routing}.api.riotgames.com/lol/match/v5/matches/{match_id}",
+            "match_detail",
+        )
+        for match_id in match_ids
+    ]
+    match_payloads = parallel_riot_fetch_json(
+        requests=match_requests,
+        api_key=api_key,
+        diagnostics=diagnostics,
+        fallback={},
+        max_workers=RIOT_PARALLEL_WORKERS,
+    )
 
     recent_matches: list[dict[str, Any]] = []
     wins = 0
@@ -1581,16 +1730,10 @@ def player_summary(
     matchup_stats: dict[str, dict[str, Any]] = {}
     enemy_support_counter: Counter[int] = Counter()
     enemy_bot_counter: Counter[int] = Counter()
+    timeline_contexts: list[dict[str, Any]] = []
 
     for match_id in match_ids:
-        match_url = f"https://{routing}.api.riotgames.com/lol/match/v5/matches/{match_id}"
-        match = optional_riot_get_json(
-            match_url,
-            api_key,
-            "match_detail",
-            fallback={},
-            diagnostics=diagnostics,
-        )
+        match = match_payloads.get(match_id, {})
         if not isinstance(match, dict) or "info" not in match:
             continue
         participants = match.get("info", {}).get("participants", [])
@@ -1720,61 +1863,7 @@ def player_summary(
             if enemy_bot_id > 0:
                 enemy_bot_counter[enemy_bot_id] += 1
 
-            assists_14 = 0
-            deaths_14 = 0
-            first_death_min = 0.0
-            gold_diff_14 = 0
-            xp_diff_14 = 0
-            timeline_url = f"https://{routing}.api.riotgames.com/lol/match/v5/matches/{match_id}/timeline"
-            timeline = optional_riot_get_json(
-                timeline_url,
-                api_key,
-                "match_timeline",
-                fallback={},
-                diagnostics=diagnostics,
-            )
-            if isinstance(timeline, dict):
-                timeline_info = timeline.get("info", {})
-                frames = timeline_info.get("frames", []) if isinstance(timeline_info, dict) else []
-                participant_id = safe_num(participant.get("participantId"))
-                enemy_support_pid = safe_num((enemy_support or {}).get("participantId"))
-
-                for frame in frames:
-                    frame_ts = safe_num(frame.get("timestamp"))
-                    if frame_ts > 14 * 60 * 1000:
-                        continue
-                    events = frame.get("events", [])
-                    if not isinstance(events, list):
-                        continue
-                    for event in events:
-                        if event.get("type") != "CHAMPION_KILL":
-                            continue
-                        if safe_num(event.get("victimId")) == participant_id:
-                            deaths_14 += 1
-                            if first_death_min <= 0:
-                                first_death_min = round(safe_num(event.get("timestamp")) / 60000, 1)
-                        assisting = event.get("assistingParticipantIds", [])
-                        if isinstance(assisting, list) and participant_id in [safe_num(x) for x in assisting]:
-                            assists_14 += 1
-
-                frame_14 = frame_at_or_before(frames, 14 * 60 * 1000)
-                if frame_14 and participant_id > 0 and enemy_support_pid > 0:
-                    pframes = frame_14.get("participantFrames", {})
-                    my_frame = pframes.get(str(participant_id), {}) if isinstance(pframes, dict) else {}
-                    opp_frame = pframes.get(str(enemy_support_pid), {}) if isinstance(pframes, dict) else {}
-                    if isinstance(my_frame, dict) and isinstance(opp_frame, dict):
-                        gold_diff_14 = safe_num(my_frame.get("totalGold")) - safe_num(opp_frame.get("totalGold"))
-                        xp_diff_14 = safe_num(my_frame.get("xp")) - safe_num(opp_frame.get("xp"))
-                        karma_gold_diff_14_sum += gold_diff_14
-                        karma_xp_diff_14_sum += xp_diff_14
-                        karma_lane_samples += 1
-
-            karma_assists_14_sum += assists_14
-            karma_deaths_14_sum += deaths_14
-            if first_death_min > 0:
-                karma_first_death_min_sum += first_death_min
-                karma_first_death_samples += 1
-
+            trend_index = len(karma_trend)
             karma_trend.append(
                 {
                     "matchId": match_id,
@@ -1784,13 +1873,22 @@ def player_summary(
                     "killParticipation": round(kill_participation, 1),
                     "visionPerMin": round(vision_score / duration_minutes, 2),
                     "controlWards": control_wards,
-                    "assists14": assists_14,
-                    "deaths14": deaths_14,
-                    "firstDeathMin": first_death_min,
-                    "goldDiff14": gold_diff_14,
-                    "xpDiff14": xp_diff_14,
+                    "assists14": 0,
+                    "deaths14": 0,
+                    "firstDeathMin": 0.0,
+                    "goldDiff14": 0,
+                    "xpDiff14": 0,
                 }
             )
+            if include_timeline:
+                timeline_contexts.append(
+                    {
+                        "matchId": match_id,
+                        "participantId": safe_num(participant.get("participantId")),
+                        "enemySupportPid": safe_num((enemy_support or {}).get("participantId")),
+                        "trendIndex": trend_index,
+                    }
+                )
 
         if should_include_in_display:
             total_kills += kills
@@ -1829,6 +1927,85 @@ def player_summary(
                     "ccScore": cc_score,
                 }
             )
+
+    if include_timeline and timeline_contexts:
+        timeline_requests = [
+            (
+                str(ctx.get("matchId", "")),
+                f"https://{routing}.api.riotgames.com/lol/match/v5/matches/{str(ctx.get('matchId', ''))}/timeline",
+                "match_timeline",
+            )
+            for ctx in timeline_contexts
+            if str(ctx.get("matchId", "")).strip()
+        ]
+        timeline_payloads = parallel_riot_fetch_json(
+            requests=timeline_requests,
+            api_key=api_key,
+            diagnostics=diagnostics,
+            fallback={},
+            max_workers=RIOT_PARALLEL_WORKERS,
+        )
+
+        for ctx in timeline_contexts:
+            match_id = str(ctx.get("matchId", "")).strip()
+            timeline = timeline_payloads.get(match_id, {})
+            if not isinstance(timeline, dict):
+                continue
+
+            participant_id = safe_num(ctx.get("participantId"))
+            enemy_support_pid = safe_num(ctx.get("enemySupportPid"))
+            trend_index = safe_num(ctx.get("trendIndex"))
+            assists_14 = 0
+            deaths_14 = 0
+            first_death_min = 0.0
+            gold_diff_14 = 0
+            xp_diff_14 = 0
+
+            timeline_info = timeline.get("info", {})
+            frames = timeline_info.get("frames", []) if isinstance(timeline_info, dict) else []
+            for frame in frames:
+                frame_ts = safe_num(frame.get("timestamp"))
+                if frame_ts > 14 * 60 * 1000:
+                    continue
+                events = frame.get("events", [])
+                if not isinstance(events, list):
+                    continue
+                for event in events:
+                    if event.get("type") != "CHAMPION_KILL":
+                        continue
+                    if safe_num(event.get("victimId")) == participant_id:
+                        deaths_14 += 1
+                        if first_death_min <= 0:
+                            first_death_min = round(safe_num(event.get("timestamp")) / 60000, 1)
+                    assisting = event.get("assistingParticipantIds", [])
+                    if isinstance(assisting, list) and participant_id in [safe_num(x) for x in assisting]:
+                        assists_14 += 1
+
+            frame_14 = frame_at_or_before(frames, 14 * 60 * 1000)
+            if frame_14 and participant_id > 0 and enemy_support_pid > 0:
+                pframes = frame_14.get("participantFrames", {})
+                my_frame = pframes.get(str(participant_id), {}) if isinstance(pframes, dict) else {}
+                opp_frame = pframes.get(str(enemy_support_pid), {}) if isinstance(pframes, dict) else {}
+                if isinstance(my_frame, dict) and isinstance(opp_frame, dict):
+                    gold_diff_14 = safe_num(my_frame.get("totalGold")) - safe_num(opp_frame.get("totalGold"))
+                    xp_diff_14 = safe_num(my_frame.get("xp")) - safe_num(opp_frame.get("xp"))
+                    karma_gold_diff_14_sum += gold_diff_14
+                    karma_xp_diff_14_sum += xp_diff_14
+                    karma_lane_samples += 1
+
+            karma_assists_14_sum += assists_14
+            karma_deaths_14_sum += deaths_14
+            if first_death_min > 0:
+                karma_first_death_min_sum += first_death_min
+                karma_first_death_samples += 1
+
+            if 0 <= trend_index < len(karma_trend):
+                trend_row = karma_trend[trend_index]
+                trend_row["assists14"] = assists_14
+                trend_row["deaths14"] = deaths_14
+                trend_row["firstDeathMin"] = first_death_min
+                trend_row["goldDiff14"] = gold_diff_14
+                trend_row["xpDiff14"] = xp_diff_14
 
     games_played = len(recent_matches)
     avg_kda = (
@@ -1888,15 +2065,25 @@ def player_summary(
     first_death_avg = round((karma_first_death_min_sum / karma_first_death_samples), 2) if karma_first_death_samples else 0.0
     gold_diff_14 = round((karma_gold_diff_14_sum / karma_lane_samples), 1) if karma_lane_samples else 0.0
     xp_diff_14 = round((karma_xp_diff_14_sum / karma_lane_samples), 1) if karma_lane_samples else 0.0
+    timeline_metrics_enabled = bool(include_timeline)
 
     delta_vs_targets = {
         "killParticipation": round(karma_kp - HIGH_LEVEL_TARGETS["kp"], 1),
         "deathsPerGame": round(karma_deaths_pg - HIGH_LEVEL_TARGETS["deaths"], 2),
         "visionPerMin": round(karma_vpm - HIGH_LEVEL_TARGETS["vision_per_min"], 2),
         "controlWardsPerGame": round(karma_ctrl_pg - HIGH_LEVEL_TARGETS["control_wards"], 2),
-        "assistsBefore14": round(assists_14_pg - HIGH_LEVEL_TARGETS["assists_14"], 2),
-        "deathsBefore14": round(deaths_14_pg - HIGH_LEVEL_TARGETS["deaths_14"], 2),
-        "firstDeathMin": round(first_death_avg - HIGH_LEVEL_TARGETS["first_death_min"], 2),
+        "assistsBefore14": (
+            round(assists_14_pg - HIGH_LEVEL_TARGETS["assists_14"], 2)
+            if timeline_metrics_enabled else 0.0
+        ),
+        "deathsBefore14": (
+            round(deaths_14_pg - HIGH_LEVEL_TARGETS["deaths_14"], 2)
+            if timeline_metrics_enabled else 0.0
+        ),
+        "firstDeathMin": (
+            round(first_death_avg - HIGH_LEVEL_TARGETS["first_death_min"], 2)
+            if timeline_metrics_enabled else 0.0
+        ),
     }
 
     deficit_rows = [
@@ -1904,9 +2091,14 @@ def player_summary(
         ("Deaths per game", max(0.0, (karma_deaths_pg - HIGH_LEVEL_TARGETS["deaths"]) / max(HIGH_LEVEL_TARGETS["deaths"], 1.0)), 25),
         ("Vision per minute", max(0.0, (HIGH_LEVEL_TARGETS["vision_per_min"] - karma_vpm) / max(HIGH_LEVEL_TARGETS["vision_per_min"], 1.0)), 20),
         ("Control wards per game", max(0.0, (HIGH_LEVEL_TARGETS["control_wards"] - karma_ctrl_pg) / max(HIGH_LEVEL_TARGETS["control_wards"], 1.0)), 15),
-        ("Assists before 14", max(0.0, (HIGH_LEVEL_TARGETS["assists_14"] - assists_14_pg) / max(HIGH_LEVEL_TARGETS["assists_14"], 1.0)), 10),
-        ("Deaths before 14", max(0.0, (deaths_14_pg - HIGH_LEVEL_TARGETS["deaths_14"]) / max(HIGH_LEVEL_TARGETS["deaths_14"], 1.0)), 10),
     ]
+    if timeline_metrics_enabled:
+        deficit_rows.extend(
+            [
+                ("Assists before 14", max(0.0, (HIGH_LEVEL_TARGETS["assists_14"] - assists_14_pg) / max(HIGH_LEVEL_TARGETS["assists_14"], 1.0)), 10),
+                ("Deaths before 14", max(0.0, (deaths_14_pg - HIGH_LEVEL_TARGETS["deaths_14"]) / max(HIGH_LEVEL_TARGETS["deaths_14"], 1.0)), 10),
+            ]
+        )
     penalty = sum(min(deficit, 1.5) * weight for _, deficit, weight in deficit_rows)
     improvement_score = max(0, round(100 - penalty))
     if improvement_score >= 85:
@@ -1975,6 +2167,7 @@ def player_summary(
             "deltaVsTargets": delta_vs_targets,
             "trend": karma_trend,
             "lanePhase": {
+                "timelineEnabled": timeline_metrics_enabled,
                 "samples": karma_lane_samples,
                 "avgGoldDiff14": gold_diff_14,
                 "avgXpDiff14": xp_diff_14,
@@ -2016,6 +2209,11 @@ class LoLTrackerHandler(SimpleHTTPRequestHandler):
         selected_enemy_support_id = safe_num(query.get("enemy_support_id", ["0"])[0])
         selected_enemy_bot_id = safe_num(query.get("enemy_bot_id", ["0"])[0])
         debug_mode = query.get("debug", ["0"])[0].strip() == "1"
+        include_timeline = TIMELINE_ENABLED_DEFAULT
+        if "timeline" in query:
+            include_timeline = is_truthy_text(query.get("timeline", ["0"])[0])
+        elif "include_timeline" in query:
+            include_timeline = is_truthy_text(query.get("include_timeline", ["0"])[0])
 
         if platform not in PLATFORM_TO_ROUTING:
             return json_response(
@@ -2025,6 +2223,22 @@ class LoLTrackerHandler(SimpleHTTPRequestHandler):
             )
 
         matches = DISPLAY_MATCH_COUNT_FIXED
+        cache_key = "|".join(
+            [
+                game_name.lower(),
+                tag_line.lower(),
+                platform,
+                str(matches),
+                str(selected_enemy_support_id),
+                str(selected_enemy_bot_id),
+                "timeline1" if include_timeline else "timeline0",
+            ]
+        )
+
+        if not debug_mode:
+            cached_payload = get_player_summary_cache(cache_key)
+            if cached_payload is not None:
+                return json_response(self, HTTPStatus.OK, cached_payload)
 
         try:
             payload = player_summary(
@@ -2036,7 +2250,10 @@ class LoLTrackerHandler(SimpleHTTPRequestHandler):
                 selected_enemy_support_id=selected_enemy_support_id,
                 selected_enemy_bot_id=selected_enemy_bot_id,
                 debug_mode=debug_mode,
+                include_timeline=include_timeline,
             )
+            if not debug_mode:
+                set_player_summary_cache(cache_key, payload)
             return json_response(self, HTTPStatus.OK, payload)
         except RiotApiError as exc:
             return json_response(

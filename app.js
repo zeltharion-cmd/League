@@ -16,6 +16,7 @@ const enemyBotSelectEl = document.getElementById("enemyBotSelect");
 
 const matchupBuildEl = document.getElementById("matchupBuild");
 const matchupBuildIconsEl = document.getElementById("matchupBuildIcons");
+const enemyPairVisualEl = document.getElementById("enemyPairVisual");
 const matchupMetaEl = document.getElementById("matchupMeta");
 const matchupAdviceEl = document.getElementById("matchupAdvice");
 const matchupRunesBtnEl = document.getElementById("matchupRunesBtn");
@@ -52,6 +53,10 @@ const supportKpMetricEl = document.getElementById("supportKpMetric");
 const supportUtilityMetricEl = document.getElementById("supportUtilityMetric");
 const matchesBodyEl = document.getElementById("matchesBody");
 const matrixRainCanvasEl = document.getElementById("matrixRain");
+const pageQueryParams = new URLSearchParams(window.location.search);
+const includeTimelineMode =
+  pageQueryParams.get("timeline") === "1" ||
+  pageQueryParams.get("include_timeline") === "1";
 
 const THEME_INPUT_IDS = {
   "--bg-0": "color-bg-0",
@@ -113,6 +118,7 @@ const RAIN_STORAGE_KEY = "kk_rain";
 
 let selectedEnemySupportId = 0;
 let selectedEnemyBotId = 0;
+let championOptionsAll = [];
 let supportOptionsAll = [];
 let botOptionsAll = [];
 let matchupRunesCache = {};
@@ -489,6 +495,50 @@ function filterChampionOptions(options, searchText) {
   return options.filter((option) => String(option.name || "").toLowerCase().includes(term));
 }
 
+function findChampionOptionById(championId) {
+  const targetId = safeNum(championId);
+  if (targetId <= 0) {
+    return null;
+  }
+
+  const pools = [championOptionsAll, supportOptionsAll, botOptionsAll];
+  for (const pool of pools) {
+    if (!Array.isArray(pool)) {
+      continue;
+    }
+    const found = pool.find((option) => safeNum(option.id) === targetId);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+function renderEnemyPair(data) {
+  if (!enemyPairVisualEl) {
+    return;
+  }
+
+  const supportId = safeNum(data?.selectedEnemySupportId);
+  const botId = safeNum(data?.selectedEnemyBotId);
+  const supportOption = findChampionOptionById(supportId);
+  const botOption = findChampionOptionById(botId);
+  const supportName = supportOption?.name || data?.selectedEnemySupport || "Enemy Support";
+  const botName = botOption?.name || data?.selectedEnemyBot || "Enemy Bot";
+
+  const chip = (label, name, icon) =>
+    `<div class="enemy-chip">` +
+    (icon ? `<img src="${icon}" alt="${name}" loading="lazy">` : "") +
+    `<span><strong>${label}:</strong> ${name}</span>` +
+    `</div>`;
+
+  setHtml(
+    enemyPairVisualEl,
+    chip("Support", supportName, supportOption?.icon || "") +
+    chip("Bot", botName, botOption?.icon || "")
+  );
+}
+
 function renderMatchupFilters() {
   const supportOptions = filterChampionOptions(supportOptionsAll, enemySupportSearchEl?.value || "");
   const botOptions = filterChampionOptions(botOptionsAll, enemyBotSearchEl?.value || "");
@@ -558,6 +608,7 @@ function renderDashboard(payload) {
 
 function renderHighEloMatchup(payload) {
   const data = payload.karmaMatchup || {};
+  championOptionsAll = Array.isArray(data.championOptions) ? data.championOptions : [];
   supportOptionsAll = Array.isArray(data.supportChampionOptions)
     ? data.supportChampionOptions
     : (Array.isArray(data.championOptions) ? data.championOptions : []);
@@ -568,6 +619,7 @@ function renderHighEloMatchup(payload) {
   selectedEnemySupportId = selectedEnemySupportId || safeNum(data.selectedEnemySupportId);
   selectedEnemyBotId = selectedEnemyBotId || safeNum(data.selectedEnemyBotId);
   renderMatchupFilters();
+  renderEnemyPair(data);
 
   const bestBuild = data.bestBuild || {};
   const bestRunes = data.bestRunes || {};
@@ -581,6 +633,35 @@ function renderHighEloMatchup(payload) {
     setHtml(matchupAdviceEl, "<li>Retry after refresh.</li>");
     setMatchupStatus(data.error);
     setText(setupHeadlineEl, "Unable to load matchup recommendation right now.");
+    return;
+  }
+
+  if (data.recommendationAvailable === false) {
+    setHtml(
+      matchupBuildEl,
+      line("Enemy Support", data.selectedEnemySupport || "-") +
+      line("Enemy Bot", data.selectedEnemyBot || "-") +
+      line("Status", "No recommendation available at or above 50% win rate.")
+    );
+    setHtml(matchupBuildIconsEl, "");
+    setHtml(
+      matchupMetaEl,
+      line("Filter", "Diamond+ only") +
+      line("Sample", `${safeNum(data.sampleMatches)} games (${safeNum(data.aggregate?.winRate).toFixed(1)}% WR)`) +
+      line("Rule", "Minimum 50.0% win rate for build and runes") +
+      line("Data Note", data.dataNote || "")
+    );
+    const advice = Array.isArray(data.advice) ? data.advice : [];
+    setHtml(
+      matchupAdviceEl,
+      advice.length ? advice.map((entry) => `<li>${entry}</li>`).join("") : "<li>No valid high-winrate setup found.</li>"
+    );
+    matchupRunesCache = { primary: [], secondary: [], shards: [] };
+    setText(
+      setupHeadlineEl,
+      `No >=50% Diamond+ recommendation found vs ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}.`
+    );
+    setMatchupStatus("No valid matchup recommendation above 50% win rate.");
     return;
   }
 
@@ -699,6 +780,9 @@ async function fetchStats() {
   query.set("game_name", gameNameInputEl?.value?.trim() || "feelsbanman");
   query.set("tag_line", tagLineInputEl?.value?.trim() || "EUW");
   query.set("platform", regionSelectEl?.value || "euw1");
+  if (includeTimelineMode) {
+    query.set("timeline", "1");
+  }
 
   if (selectedEnemySupportId > 0) {
     query.set("enemy_support_id", String(selectedEnemySupportId));
