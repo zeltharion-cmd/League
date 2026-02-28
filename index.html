@@ -12,15 +12,26 @@
 <body>
   <main class="shell">
     <header class="hero">
-      <p class="eyebrow">League of Legends</p>
+      <div class="hero-top">
+        <p class="eyebrow">League of Legends</p>
+        <button id="customizeBtn" type="button" class="customize-btn">Customize</button>
+      </div>
       <h1>Karma Kommand Kenter</h1>
-      <p class="subtitle">Summoner's Rift command board locked to feelsbanman#EUW with support-first tracking for vision, utility, and lane control.</p>
+      <p class="subtitle">Summoner's Rift command board focused on your Karma setup and the highest-winrate response to the current enemy botlane.</p>
+      <p id="setupHeadline" class="setup-headline">Loading your Karma setup...</p>
     </header>
 
     <section class="search-card">
       <form id="searchForm" class="search-form">
-        <input id="accountLock" type="text" value="Account: feelsbanman #EUW" readonly>
-        <input id="regionLock" type="text" value="Region: EUW1 only" readonly>
+        <input id="gameNameInput" type="text" value="feelsbanman" placeholder="Game Name" required>
+        <input id="tagLineInput" type="text" value="EUW" placeholder="Tag Line" required>
+        <select id="regionSelect">
+          <option value="euw1" selected>EUW1</option>
+          <option value="eun1">EUN1</option>
+          <option value="na1">NA1</option>
+          <option value="kr">KR</option>
+          <option value="oc1">OC1</option>
+        </select>
         <button id="searchBtn" type="submit">Refresh</button>
       </form>
       <p id="statusText" class="status">Shows latest 5 matches. Matchup recommendations use Diamond+ Deeplol samples.</p>
@@ -33,24 +44,26 @@
           <p id="matchupStatus" class="status">Loading matchup recommendations...</p>
         </div>
         <div class="otp-controls">
-          <label for="enemySupportSelect">Enemy Support</label>
+          <label for="enemySupportSearch">Enemy Support</label>
+          <input id="enemySupportSearch" class="filter-input" type="text" placeholder="Filter support champion...">
           <select id="enemySupportSelect"></select>
-          <label for="enemyBotSelect">Enemy Bot Carry</label>
+          <label for="enemyBotSearch">Enemy Bot Carry</label>
+          <input id="enemyBotSearch" class="filter-input" type="text" placeholder="Filter bot champion...">
           <select id="enemyBotSelect"></select>
         </div>
       </div>
       <div class="otp-grid">
         <article class="mini otp-block">
-          <h4>Best Build Vs Botlane</h4>
-          <div id="matchupBuild" class="stack-text">Loading...</div>
-          <div id="matchupBuildIcons" class="icon-row"></div>
-          <button id="matchupRunesBtn" type="button" class="rune-btn">Open Matchup Runes</button>
-        </article>
-        <article class="mini otp-block">
-          <h4>Your Karma Setup</h4>
+          <h4>Your Karma Setup (Priority)</h4>
           <div id="yourBuild" class="stack-text">Loading...</div>
           <div id="yourBuildIcons" class="icon-row"></div>
           <button id="yourRunesBtn" type="button" class="rune-btn">Open Your Runes</button>
+        </article>
+        <article class="mini otp-block">
+          <h4>Best Build Vs Current Botlane</h4>
+          <div id="matchupBuild" class="stack-text">Loading...</div>
+          <div id="matchupBuildIcons" class="icon-row"></div>
+          <button id="matchupRunesBtn" type="button" class="rune-btn">Open Matchup Runes</button>
         </article>
         <article class="mini otp-block">
           <h4>Sample / Filter</h4>
@@ -75,7 +88,46 @@
       </div>
     </div>
 
+    <div id="customizeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="customizeTitle">
+      <div class="modal-card customize-card">
+        <div class="modal-head">
+          <h3 id="customizeTitle">Theme Customization</h3>
+          <button id="closeCustomizeModal" type="button" class="close-btn">Close</button>
+        </div>
+        <div class="customize-controls">
+          <label class="toggle-row">
+            <input id="rainToggle" type="checkbox" checked>
+            <span>Enable Matrix Rain</span>
+          </label>
+          <h4>Preset Themes</h4>
+          <div id="presetGrid" class="preset-grid"></div>
+          <h4>Full Color Controls</h4>
+          <div class="color-grid">
+            <label>Background 1<input id="color-bg-0" type="color"></label>
+            <label>Background 2<input id="color-bg-1" type="color"></label>
+            <label>Panel<input id="color-panel" type="color"></label>
+            <label>Panel Soft<input id="color-panel-soft" type="color"></label>
+            <label>Text<input id="color-ink" type="color"></label>
+            <label>Muted Text<input id="color-muted" type="color"></label>
+            <label>Gold<input id="color-gold" type="color"></label>
+            <label>Gold Strong<input id="color-gold-strong" type="color"></label>
+            <label>Accent<input id="color-accent" type="color"></label>
+          </div>
+          <div class="customize-actions">
+            <button id="applyThemeBtn" type="button" class="rune-btn">Apply</button>
+            <button id="resetThemeBtn" type="button" class="rune-btn">Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <section id="dashboard" class="dashboard hidden">
+      <div class="card wide impact-score">
+        <h3>Karma Improvement Score</h3>
+        <div id="improvementScore" class="score-box">-</div>
+        <ul id="focusTargets" class="advice-list"></ul>
+      </div>
+
       <div class="profile-card card">
         <h2 id="playerHeading">Player</h2>
         <div id="profileMeta" class="profile-meta"></div>
@@ -98,17 +150,6 @@
           <article class="metric mini"><h4>Kill Participation</h4><p id="supportKpMetric">-</p></article>
           <article class="metric mini"><h4>Ally Utility / Game</h4><p id="supportUtilityMetric">-</p></article>
         </div>
-      </div>
-
-      <div class="card wide">
-        <h3>Karma Improvement Score</h3>
-        <div id="improvementScore" class="score-box">-</div>
-        <ul id="focusTargets" class="advice-list"></ul>
-      </div>
-
-      <div class="card wide">
-        <h3>Karma Trend (Last 30 Sample)</h3>
-        <div id="trendChart" class="trend-chart"></div>
       </div>
 
       <div class="card wide">

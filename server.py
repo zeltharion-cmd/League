@@ -35,6 +35,14 @@ HIGH_LEVEL_TARGETS = {
     "deaths_14": 1.0,
     "first_death_min": 9.0,
 }
+SUPPORT_CHAMPION_IDS = {
+    12, 16, 22, 40, 43, 44, 53, 63, 89, 111, 117, 201, 223, 235, 267, 350, 412,
+    421, 432, 497, 526, 555, 561, 875, 876, 888, 902, 950, 954,
+}
+BOT_CARRY_CHAMPION_IDS = {
+    15, 18, 21, 22, 29, 42, 51, 67, 81, 96, 110, 119, 145, 147, 202, 203, 222,
+    236, 360, 429, 498, 523, 895,
+}
 STATIC_REF_CACHE: dict[str, Any] = {
     "fetched_at": 0,
     "version": "",
@@ -462,6 +470,16 @@ def build_champion_options(
     return rows
 
 
+def filter_champion_options(
+    options: list[dict[str, Any]],
+    allowed_ids: set[int],
+) -> list[dict[str, Any]]:
+    filtered = [row for row in options if safe_num(row.get("id")) in allowed_ids]
+    if filtered:
+        return filtered
+    return options
+
+
 def get_matchup_rows_from_deeplol(
     enemy_champion_id: int,
     *,
@@ -635,9 +653,13 @@ def karma_matchup_recommendation_from_deeplol(
             "selectedEnemySupportId": safe_num(enemy_support_id),
             "selectedEnemyBotId": safe_num(enemy_bot_id),
             "championOptions": [],
+            "supportChampionOptions": [],
+            "botChampionOptions": [],
         }
 
     champion_options = build_champion_options(champion_names, champion_icons)
+    support_options = filter_champion_options(champion_options, SUPPORT_CHAMPION_IDS)
+    bot_options = filter_champion_options(champion_options, BOT_CARRY_CHAMPION_IDS)
     selected_support = safe_num(enemy_support_id)
     selected_bot = safe_num(enemy_bot_id)
     if selected_support <= 0 or selected_support not in champion_names:
@@ -656,6 +678,8 @@ def karma_matchup_recommendation_from_deeplol(
             "selectedEnemySupport": "Select enemy support",
             "selectedEnemyBot": "Select enemy bot carry",
             "championOptions": champion_options,
+            "supportChampionOptions": support_options,
+            "botChampionOptions": bot_options,
             "sampleMatches": 0,
             "aggregate": {"wins": 0, "losses": 0, "winRate": 0.0},
             "bestBuild": {},
@@ -700,6 +724,8 @@ def karma_matchup_recommendation_from_deeplol(
             "selectedEnemySupport": champion_names.get(selected_support, "Unknown"),
             "selectedEnemyBot": champion_names.get(selected_bot, "Unknown"),
             "championOptions": champion_options,
+            "supportChampionOptions": support_options,
+            "botChampionOptions": bot_options,
         }
 
     if not matchup_rows:
@@ -713,6 +739,8 @@ def karma_matchup_recommendation_from_deeplol(
             "selectedEnemySupport": champion_names.get(selected_support, "Unknown"),
             "selectedEnemyBot": champion_names.get(selected_bot, "Unknown"),
             "championOptions": champion_options,
+            "supportChampionOptions": support_options,
+            "botChampionOptions": bot_options,
             "sampleMatches": 0,
             "aggregate": {"wins": 0, "losses": 0, "winRate": 0.0},
             "bestBuild": {},
@@ -868,7 +896,7 @@ def karma_matchup_recommendation_from_deeplol(
             f"Use {id_name(selected_secondary_style, rune_names, 'Rune')} as the secondary tree versus this champion."
         )
     if sample_win_rate < 50:
-        advice.append("KR OTP sample is below 50% here; play lane safer and prioritize vision tempo.")
+        advice.append("Matchup sample is below 50% here; play lane safer and prioritize vision tempo.")
     if not advice:
         advice.append("Your current Karma setup is already close to this matchup recommendation.")
 
@@ -883,6 +911,8 @@ def karma_matchup_recommendation_from_deeplol(
         "selectedEnemySupport": champion_names.get(selected_support, "Unknown"),
         "selectedEnemyBot": champion_names.get(selected_bot, "Unknown"),
         "championOptions": champion_options,
+        "supportChampionOptions": support_options,
+        "botChampionOptions": bot_options,
         "sampleMatches": sample_games,
         "aggregate": {
             "wins": wins,
@@ -1980,20 +2010,12 @@ class LoLTrackerHandler(SimpleHTTPRequestHandler):
             )
 
         query = urllib.parse.parse_qs(parsed.query)
-        # This tracker is intentionally hard-locked to one account.
-        game_name = LOCKED_GAME_NAME
-        tag_line = LOCKED_TAG_LINE
+        game_name = query.get("game_name", [LOCKED_GAME_NAME])[0].strip() or LOCKED_GAME_NAME
+        tag_line = query.get("tag_line", [LOCKED_TAG_LINE])[0].strip() or LOCKED_TAG_LINE
         platform = query.get("platform", [PLATFORM_FIXED])[0].strip().lower()
         selected_enemy_support_id = safe_num(query.get("enemy_support_id", ["0"])[0])
         selected_enemy_bot_id = safe_num(query.get("enemy_bot_id", ["0"])[0])
         debug_mode = query.get("debug", ["0"])[0].strip() == "1"
-
-        if platform != PLATFORM_FIXED:
-            return json_response(
-                self,
-                HTTPStatus.BAD_REQUEST,
-                {"error": "This tracker is locked to EUW1 only."},
-            )
 
         if platform not in PLATFORM_TO_ROUTING:
             return json_response(

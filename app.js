@@ -3,9 +3,17 @@ const searchBtnEl = document.getElementById("searchBtn");
 const statusTextEl = document.getElementById("statusText");
 const dashboardEl = document.getElementById("dashboard");
 const matchupStatusEl = document.getElementById("matchupStatus");
+const setupHeadlineEl = document.getElementById("setupHeadline");
 
+const gameNameInputEl = document.getElementById("gameNameInput");
+const tagLineInputEl = document.getElementById("tagLineInput");
+const regionSelectEl = document.getElementById("regionSelect");
+
+const enemySupportSearchEl = document.getElementById("enemySupportSearch");
+const enemyBotSearchEl = document.getElementById("enemyBotSearch");
 const enemySupportSelectEl = document.getElementById("enemySupportSelect");
 const enemyBotSelectEl = document.getElementById("enemyBotSelect");
+
 const matchupBuildEl = document.getElementById("matchupBuild");
 const yourBuildEl = document.getElementById("yourBuild");
 const matchupBuildIconsEl = document.getElementById("matchupBuildIcons");
@@ -20,9 +28,16 @@ const closeRunesModalEl = document.getElementById("closeRunesModal");
 const runesTitleEl = document.getElementById("runesTitle");
 const runesBodyEl = document.getElementById("runesBody");
 
+const customizeBtnEl = document.getElementById("customizeBtn");
+const customizeModalEl = document.getElementById("customizeModal");
+const closeCustomizeModalEl = document.getElementById("closeCustomizeModal");
+const rainToggleEl = document.getElementById("rainToggle");
+const presetGridEl = document.getElementById("presetGrid");
+const applyThemeBtnEl = document.getElementById("applyThemeBtn");
+const resetThemeBtnEl = document.getElementById("resetThemeBtn");
+
 const improvementScoreEl = document.getElementById("improvementScore");
 const focusTargetsEl = document.getElementById("focusTargets");
-const trendChartEl = document.getElementById("trendChart");
 const laneStatsEl = document.getElementById("laneStats");
 const matchupBodyEl = document.getElementById("matchupBody");
 
@@ -40,10 +55,75 @@ const supportKpMetricEl = document.getElementById("supportKpMetric");
 const supportUtilityMetricEl = document.getElementById("supportUtilityMetric");
 const matchesBodyEl = document.getElementById("matchesBody");
 
+const THEME_INPUT_IDS = {
+  "--bg-0": "color-bg-0",
+  "--bg-1": "color-bg-1",
+  "--panel": "color-panel",
+  "--panel-soft": "color-panel-soft",
+  "--ink": "color-ink",
+  "--muted": "color-muted",
+  "--gold": "color-gold",
+  "--gold-strong": "color-gold-strong",
+  "--accent": "color-accent",
+};
+
+const PRESET_THEMES = [
+  {
+    name: "Rift Gold",
+    vars: { "--bg-0": "#060b14", "--bg-1": "#0a1526", "--panel": "#0f2138", "--panel-soft": "#132a46", "--ink": "#f4ead4", "--muted": "#a6bdd2", "--gold": "#c8a461", "--gold-strong": "#f0d08f", "--accent": "#41a5d3" },
+  },
+  {
+    name: "Arc Light",
+    vars: { "--bg-0": "#0b0f1b", "--bg-1": "#1d2946", "--panel": "#1d2e54", "--panel-soft": "#2d4374", "--ink": "#e7f4ff", "--muted": "#9dc4df", "--gold": "#7fb8ff", "--gold-strong": "#b3dbff", "--accent": "#53d2ff" },
+  },
+  {
+    name: "Infernal",
+    vars: { "--bg-0": "#150806", "--bg-1": "#2d1109", "--panel": "#32150f", "--panel-soft": "#4b2417", "--ink": "#ffe7d1", "--muted": "#d8b49e", "--gold": "#ff8a47", "--gold-strong": "#ffc08d", "--accent": "#ff5d3a" },
+  },
+  {
+    name: "Elderwood",
+    vars: { "--bg-0": "#06130e", "--bg-1": "#123024", "--panel": "#173a2d", "--panel-soft": "#20523f", "--ink": "#e9f8ec", "--muted": "#9fcab4", "--gold": "#88c26b", "--gold-strong": "#bee9a2", "--accent": "#57d390" },
+  },
+  {
+    name: "Void",
+    vars: { "--bg-0": "#0b0616", "--bg-1": "#1f1036", "--panel": "#251645", "--panel-soft": "#372365", "--ink": "#f1e8ff", "--muted": "#b7a8d6", "--gold": "#a178ff", "--gold-strong": "#c8acff", "--accent": "#8c5bff" },
+  },
+  {
+    name: "Hextech",
+    vars: { "--bg-0": "#061014", "--bg-1": "#0d2833", "--panel": "#113745", "--panel-soft": "#1a495a", "--ink": "#e9f8ff", "--muted": "#9fc2cf", "--gold": "#31b5d0", "--gold-strong": "#88e2f5", "--accent": "#4ce6ff" },
+  },
+  {
+    name: "Nightfall",
+    vars: { "--bg-0": "#0f1014", "--bg-1": "#191d2a", "--panel": "#20283a", "--panel-soft": "#2a344c", "--ink": "#eff2fa", "--muted": "#a4afc3", "--gold": "#9aa6bf", "--gold-strong": "#d7deef", "--accent": "#7f92bf" },
+  },
+  {
+    name: "Bilgewater",
+    vars: { "--bg-0": "#071015", "--bg-1": "#13222b", "--panel": "#1a3039", "--panel-soft": "#25444f", "--ink": "#eaf7f4", "--muted": "#a7c8bf", "--gold": "#61bca0", "--gold-strong": "#9de5cc", "--accent": "#3fd6b2" },
+  },
+  {
+    name: "Sandstorm",
+    vars: { "--bg-0": "#151006", "--bg-1": "#2b1f0d", "--panel": "#3a2b15", "--panel-soft": "#594323", "--ink": "#fff1d5", "--muted": "#ddc59b", "--gold": "#d2a757", "--gold-strong": "#f4d499", "--accent": "#f0bf6a" },
+  },
+  {
+    name: "Neon Matrix",
+    vars: { "--bg-0": "#030d09", "--bg-1": "#0b2217", "--panel": "#0d2f20", "--panel-soft": "#114430", "--ink": "#d8ffe8", "--muted": "#8ed6b0", "--gold": "#3fe28f", "--gold-strong": "#88ffc0", "--accent": "#27f2a4" },
+  },
+];
+
+const THEME_STORAGE_KEY = "kk_theme_vars";
+const RAIN_STORAGE_KEY = "kk_rain";
+
 let selectedEnemySupportId = 0;
 let selectedEnemyBotId = 0;
+let supportOptionsAll = [];
+let botOptionsAll = [];
 let matchupRunesCache = {};
 let yourRunesCache = {};
+
+function safeNum(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
 
 function setStatus(message) {
   statusTextEl.textContent = message;
@@ -51,11 +131,6 @@ function setStatus(message) {
 
 function setMatchupStatus(message) {
   matchupStatusEl.textContent = message;
-}
-
-function safeNum(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
 }
 
 function line(label, value) {
@@ -99,35 +174,6 @@ function runeSection(title, entries) {
   );
 }
 
-function renderTrendChart(trend) {
-  const rows = Array.isArray(trend) ? [...trend].reverse() : [];
-  if (!rows.length) {
-    trendChartEl.innerHTML = "<div class='stack-text'>No trend data yet.</div>";
-    return;
-  }
-
-  const width = 920;
-  const height = 210;
-  const pad = 24;
-  const values = rows.map((r) => safeNum(r.killParticipation));
-  const minV = Math.min(...values, 40);
-  const maxV = Math.max(...values, 80);
-  const range = Math.max(maxV - minV, 1);
-  const points = rows.map((row, idx) => {
-    const x = pad + (idx * (width - pad * 2)) / Math.max(rows.length - 1, 1);
-    const y = height - pad - ((safeNum(row.killParticipation) - minV) / range) * (height - pad * 2);
-    return `${x},${y}`;
-  }).join(" ");
-
-  trendChartEl.innerHTML =
-    `<svg viewBox="0 0 ${width} ${height}" class="trend-svg" preserveAspectRatio="none">` +
-    `<line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" class="axis" />` +
-    `<line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" class="axis" />` +
-    `<polyline points="${points}" class="trend-line" />` +
-    `</svg>` +
-    `<div class="trend-caption">Kill Participation trend (latest 30 sampled Karma games)</div>`;
-}
-
 function openRunesModal(type) {
   const isMatchup = type === "matchup";
   const runes = isMatchup ? matchupRunesCache : yourRunesCache;
@@ -137,6 +183,129 @@ function openRunesModal(type) {
     runeSection("Secondary", runes.secondary || []) +
     runeSection("Shards", runes.shards || []);
   runesModalEl.classList.remove("hidden");
+}
+
+function applyRainEnabled(enabled) {
+  if (enabled) {
+    document.body.classList.remove("rain-off");
+  } else {
+    document.body.classList.add("rain-off");
+  }
+  rainToggleEl.checked = enabled;
+  localStorage.setItem(RAIN_STORAGE_KEY, enabled ? "1" : "0");
+}
+
+function readCurrentThemeVars() {
+  const computed = getComputedStyle(document.documentElement);
+  const values = {};
+  for (const key of Object.keys(THEME_INPUT_IDS)) {
+    values[key] = computed.getPropertyValue(key).trim() || "#000000";
+  }
+  return values;
+}
+
+function applyThemeVars(values) {
+  const root = document.documentElement;
+  for (const [key, value] of Object.entries(values)) {
+    if (!THEME_INPUT_IDS[key]) {
+      continue;
+    }
+    root.style.setProperty(key, value);
+  }
+}
+
+function syncThemeInputsFromVars(values) {
+  for (const [cssKey, inputId] of Object.entries(THEME_INPUT_IDS)) {
+    const input = document.getElementById(inputId);
+    if (!input) {
+      continue;
+    }
+    input.value = values[cssKey] || "#000000";
+  }
+}
+
+function saveThemeVars(values) {
+  localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(values));
+}
+
+function loadSavedThemeVars() {
+  try {
+    const raw = localStorage.getItem(THEME_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function buildPresetButtons() {
+  presetGridEl.innerHTML = PRESET_THEMES
+    .map((preset, idx) => `<button type="button" class="preset-btn" data-preset-index="${idx}">${preset.name}</button>`)
+    .join("");
+  for (const button of presetGridEl.querySelectorAll(".preset-btn")) {
+    button.addEventListener("click", () => {
+      const index = safeNum(button.getAttribute("data-preset-index"));
+      const preset = PRESET_THEMES[index] || PRESET_THEMES[0];
+      applyThemeVars(preset.vars);
+      syncThemeInputsFromVars(readCurrentThemeVars());
+      saveThemeVars(readCurrentThemeVars());
+    });
+  }
+}
+
+function initThemeControls() {
+  buildPresetButtons();
+
+  const savedTheme = loadSavedThemeVars();
+  if (savedTheme) {
+    applyThemeVars(savedTheme);
+  }
+  syncThemeInputsFromVars(readCurrentThemeVars());
+
+  const rainSaved = localStorage.getItem(RAIN_STORAGE_KEY);
+  applyRainEnabled(rainSaved !== "0");
+
+  customizeBtnEl.addEventListener("click", () => {
+    customizeModalEl.classList.remove("hidden");
+  });
+
+  closeCustomizeModalEl.addEventListener("click", () => {
+    customizeModalEl.classList.add("hidden");
+  });
+
+  customizeModalEl.addEventListener("click", (event) => {
+    if (event.target === customizeModalEl) {
+      customizeModalEl.classList.add("hidden");
+    }
+  });
+
+  rainToggleEl.addEventListener("change", () => {
+    applyRainEnabled(Boolean(rainToggleEl.checked));
+  });
+
+  applyThemeBtnEl.addEventListener("click", () => {
+    const values = {};
+    for (const [cssKey, inputId] of Object.entries(THEME_INPUT_IDS)) {
+      const input = document.getElementById(inputId);
+      values[cssKey] = input?.value || "#000000";
+    }
+    applyThemeVars(values);
+    saveThemeVars(values);
+  });
+
+  resetThemeBtnEl.addEventListener("click", () => {
+    const base = PRESET_THEMES[0].vars;
+    applyThemeVars(base);
+    syncThemeInputsFromVars(readCurrentThemeVars());
+    saveThemeVars(readCurrentThemeVars());
+    applyRainEnabled(true);
+  });
 }
 
 function renderChampionSelect(selectEl, options, selected, placeholder) {
@@ -157,6 +326,21 @@ function renderChampionSelect(selectEl, options, selected, placeholder) {
   selectEl.disabled = false;
 }
 
+function filterChampionOptions(options, searchText) {
+  const term = String(searchText || "").trim().toLowerCase();
+  if (!term) {
+    return options;
+  }
+  return options.filter((option) => String(option.name || "").toLowerCase().includes(term));
+}
+
+function renderMatchupFilters() {
+  const supportOptions = filterChampionOptions(supportOptionsAll, enemySupportSearchEl.value);
+  const botOptions = filterChampionOptions(botOptionsAll, enemyBotSearchEl.value);
+  renderChampionSelect(enemySupportSelectEl, supportOptions, selectedEnemySupportId, "Select enemy support");
+  renderChampionSelect(enemyBotSelectEl, botOptions, selectedEnemyBotId, "Select enemy bot carry");
+}
+
 function renderDashboard(payload) {
   const player = payload.player || {};
   const aggregate = payload.aggregate || {};
@@ -165,7 +349,7 @@ function renderDashboard(payload) {
 
   playerHeadingEl.textContent = `${player.gameName || "feelsbanman"} #${player.tagLine || "EUW"}`;
   profileMetaEl.innerHTML =
-    `<div>Region: <strong>EUW1</strong></div>` +
+    `<div>Region: <strong>${String(regionSelectEl.value || "euw1").toUpperCase()}</strong></div>` +
     `<div>Summoner Level: <strong>${safeNum(player.summonerLevel)}</strong></div>` +
     `<div>Profile Icon ID: <strong>${safeNum(player.profileIconId)}</strong></div>`;
 
@@ -212,13 +396,16 @@ function renderDashboard(payload) {
 
 function renderHighEloMatchup(payload) {
   const data = payload.karmaMatchup || {};
-  const options = Array.isArray(data.championOptions) ? data.championOptions : [];
+  supportOptionsAll = Array.isArray(data.supportChampionOptions)
+    ? data.supportChampionOptions
+    : (Array.isArray(data.championOptions) ? data.championOptions : []);
+  botOptionsAll = Array.isArray(data.botChampionOptions)
+    ? data.botChampionOptions
+    : (Array.isArray(data.championOptions) ? data.championOptions : []);
 
   selectedEnemySupportId = selectedEnemySupportId || safeNum(data.selectedEnemySupportId);
   selectedEnemyBotId = selectedEnemyBotId || safeNum(data.selectedEnemyBotId);
-
-  renderChampionSelect(enemySupportSelectEl, options, selectedEnemySupportId, "Select enemy support");
-  renderChampionSelect(enemyBotSelectEl, options, selectedEnemyBotId, "Select enemy bot carry");
+  renderMatchupFilters();
 
   const bestBuild = data.bestBuild || {};
   const bestRunes = data.bestRunes || {};
@@ -236,6 +423,7 @@ function renderHighEloMatchup(payload) {
     matchupMetaEl.innerHTML = line("Filter", "Diamond+") + line("Sample", "0 games");
     matchupAdviceEl.innerHTML = "<li>Retry after refresh.</li>";
     setMatchupStatus(data.error);
+    setupHeadlineEl.textContent = "Unable to load your Karma setup right now.";
     return;
   }
 
@@ -271,7 +459,7 @@ function renderHighEloMatchup(payload) {
     line("Keystone", yourRunes.keystone || "-") +
     line("Primary Tree", yourRunes.primaryStyle || "-") +
     line("Secondary Tree", yourRunes.secondaryStyle || "-") +
-    line("Missing vs High Elo", missingCore || "-");
+    line("Missing vs High WR", missingCore || "-");
 
   const yourIcons = [
     ...(Array.isArray(your.coreItemsDetailed) ? your.coreItemsDetailed : []),
@@ -309,8 +497,12 @@ function renderHighEloMatchup(payload) {
     shards: Array.isArray(yourRunes.statShardsDetailed) ? yourRunes.statShardsDetailed : [],
   };
 
+  setupHeadlineEl.textContent =
+    `Your Karma setup: ${yourCore || "-"} (${yourRunes.keystone || "No keystone"}). ` +
+    `Best vs ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}: ${matchupCore || "-"}.`;
+
   setMatchupStatus(
-    `Loaded Diamond+ matchup model: ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}.`
+    `Loaded highest-winrate Diamond+ matchup model: ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}.`
   );
 }
 
@@ -323,12 +515,10 @@ function renderKarmaInsights(payload) {
 
   improvementScoreEl.innerHTML =
     `<div class="score-main">${safeNum(score.score)} <small>${score.grade || "-"}</small></div>` +
-    `<div class="score-sub">Closer to high-level support targets means stronger consistency.</div>`;
+    `<div class="score-sub">Your support impact score. Push this up by closing the target gaps below.</div>`;
   focusTargetsEl.innerHTML = focus.length
     ? focus.map((entry) => `<li>${entry}</li>`).join("")
     : "<li>No urgent target gaps detected.</li>";
-
-  renderTrendChart(insights.trend || []);
 
   laneStatsEl.innerHTML =
     line("Gold Diff @14", safeNum(lane.avgGoldDiff14).toFixed(1)) +
@@ -341,25 +531,27 @@ function renderKarmaInsights(payload) {
     matchupBodyEl.innerHTML = `<tr><td colspan="7">No matchup data yet.</td></tr>`;
   } else {
     matchupBodyEl.innerHTML = matchups
-      .map((row) => {
-        return (
-          "<tr>" +
-          `<td>${row.enemySupport || "-"}</td>` +
-          `<td>${row.enemyBot || "-"}</td>` +
-          `<td>${safeNum(row.games)}</td>` +
-          `<td>${safeNum(row.winRate).toFixed(1)}%</td>` +
-          `<td>${safeNum(row.avgKillParticipation).toFixed(1)}%</td>` +
-          `<td>${safeNum(row.avgDeaths).toFixed(2)}</td>` +
-          `<td>${safeNum(row.avgVisionPerMin).toFixed(2)}</td>` +
-          "</tr>"
-        );
-      })
+      .map((row) => (
+        "<tr>" +
+        `<td>${row.enemySupport || "-"}</td>` +
+        `<td>${row.enemyBot || "-"}</td>` +
+        `<td>${safeNum(row.games)}</td>` +
+        `<td>${safeNum(row.winRate).toFixed(1)}%</td>` +
+        `<td>${safeNum(row.avgKillParticipation).toFixed(1)}%</td>` +
+        `<td>${safeNum(row.avgDeaths).toFixed(2)}</td>` +
+        `<td>${safeNum(row.avgVisionPerMin).toFixed(2)}</td>` +
+        "</tr>"
+      ))
       .join("");
   }
 }
 
 async function fetchStats() {
   const query = new URLSearchParams();
+  query.set("game_name", gameNameInputEl.value.trim() || "feelsbanman");
+  query.set("tag_line", tagLineInputEl.value.trim() || "EUW");
+  query.set("platform", regionSelectEl.value || "euw1");
+
   if (selectedEnemySupportId > 0) {
     query.set("enemy_support_id", String(selectedEnemySupportId));
   }
@@ -367,9 +559,7 @@ async function fetchStats() {
     query.set("enemy_bot_id", String(selectedEnemyBotId));
   }
 
-  const response = await fetch(`/api/stats?${query.toString()}`, {
-    cache: "no-store",
-  });
+  const response = await fetch(`/api/stats?${query.toString()}`, { cache: "no-store" });
 
   let payload = {};
   try {
@@ -391,7 +581,12 @@ async function refreshStats() {
   searchBtnEl.disabled = true;
   enemySupportSelectEl.disabled = true;
   enemyBotSelectEl.disabled = true;
-  setStatus("Loading feelsbanman#EUW stats...");
+
+  const gameName = gameNameInputEl.value.trim() || "feelsbanman";
+  const tagLine = tagLineInputEl.value.trim() || "EUW";
+  const platform = (regionSelectEl.value || "euw1").toUpperCase();
+
+  setStatus(`Loading ${gameName}#${tagLine} on ${platform}...`);
   setMatchupStatus("Loading Diamond+ matchup recommendations...");
 
   try {
@@ -406,16 +601,25 @@ async function refreshStats() {
     const support = payload.karmaMatchup?.selectedEnemySupport || "-";
     const bot = payload.karmaMatchup?.selectedEnemyBot || "-";
     setStatus(
-      `Loaded latest 5 EUW matches. Highest-winrate Diamond+ matchup model loaded for ${support} + ${bot}.`
+      `Loaded latest 5 ${platform} matches for ${gameName}#${tagLine}. High-winrate matchup model loaded for ${support} + ${bot}.`
     );
   } catch (error) {
     dashboardEl.classList.add("hidden");
     setStatus(error.message || "Failed to load stats.");
     setMatchupStatus("Matchup model unavailable.");
+    setupHeadlineEl.textContent = "Unable to load your Karma setup right now.";
   } finally {
     searchBtnEl.disabled = false;
   }
 }
+
+enemySupportSearchEl.addEventListener("input", () => {
+  renderMatchupFilters();
+});
+
+enemyBotSearchEl.addEventListener("input", () => {
+  renderMatchupFilters();
+});
 
 enemySupportSelectEl.addEventListener("change", async () => {
   selectedEnemySupportId = safeNum(enemySupportSelectEl.value);
@@ -447,7 +651,10 @@ runesModalEl.addEventListener("click", (event) => {
 
 searchFormEl.addEventListener("submit", async (event) => {
   event.preventDefault();
+  selectedEnemySupportId = 0;
+  selectedEnemyBotId = 0;
   await refreshStats();
 });
 
+initThemeControls();
 void refreshStats();
