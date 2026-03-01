@@ -1093,7 +1093,7 @@ def karma_matchup_recommendation_from_deeplol(
         )
     if selected_secondary_style and your_secondary_style_id and selected_secondary_style != your_secondary_style_id:
         advice.append(
-            f"Use {id_name(selected_secondary_style, rune_names, 'Rune')} as the secondary tree versus this champion."
+            f"Use {id_name(selected_secondary_style, rune_names, 'Rune')} as the secondary tree for this botlane."
         )
     if not advice:
         advice.append("Your current Karma setup is already close to this matchup recommendation.")

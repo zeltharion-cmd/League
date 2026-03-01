@@ -159,12 +159,21 @@ function renderWinrateSources(sources) {
   if (!Array.isArray(sources) || !sources.length) {
     return "-";
   }
-  return sources
+  const visible = sources.filter((source) => safeNum(source?.games) > 0);
+  if (!visible.length) {
+    return "-";
+  }
+  return visible
     .map((source) => {
-      const name = String(source?.name || "Source");
+      const rawName = String(source?.name || "Source");
+      const name = rawName
+        .replace("Deeplol Matchup (Diamond+)", "Deeplol Diamond+ Matchup")
+        .replace("Riot Same Matchup (Recent)", "Riot Same Matchup")
+        .replace("Combined Matchup Model", "Combined Model")
+        .replace("Riot Your Karma (Recent)", "Your Karma Recent");
       const wr = `${safeNum(source?.winRate).toFixed(1)}%`;
       const games = safeNum(source?.games);
-      return `${name}: ${wr} (${games}g)`;
+      return `• ${name}: ${wr} (${games}g)`;
     })
     .join("<br>");
 }
@@ -660,10 +669,10 @@ function renderHighEloMatchup(payload) {
     setHtml(matchupBuildIconsEl, "");
     setHtml(
       matchupMetaEl,
-      line("Filter", "Diamond+ only") +
+      line("Filter", data.eloFilter || "Diamond+ only") +
       line("Sample", `${safeNum(data.sampleMatches)} games (${safeNum(data.aggregate?.winRate).toFixed(1)}% WR)`) +
       line("Rule", "Only show recommendations with >50.0% WR (matchup, build, runes)") +
-      line("Winrate Sources", renderWinrateSources(data.winrateSources)) +
+      line("Cross-Source WR", renderWinrateSources(data.winrateSources)) +
       line("Data Note", data.dataNote || "")
     );
     const advice = Array.isArray(data.advice) ? data.advice : [];
@@ -709,7 +718,7 @@ function renderHighEloMatchup(payload) {
     line("Elo Filter", data.eloFilter || "DIAMOND+") +
     line("Build WR", `${safeNum(bestBuild.winRate).toFixed(1)}% in ${safeNum(bestBuild.games)} games`) +
     line("Rune WR", `${safeNum(bestRunes.winRate).toFixed(1)}% in ${safeNum(bestRunes.games)} games`) +
-    line("Winrate Sources", renderWinrateSources(data.winrateSources)) +
+    line("Cross-Source WR", renderWinrateSources(data.winrateSources)) +
     line("Data Note", data.dataNote || "")
   );
 
@@ -737,7 +746,7 @@ function renderHighEloMatchup(payload) {
   );
 
   setMatchupStatus(
-    `Loaded highest-winrate Diamond+ matchup model: ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}.`
+    `Loaded recommendation for ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"} (${data.source || "model"}).`
   );
 }
 

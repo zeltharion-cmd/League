@@ -337,8 +337,8 @@ body::after {
 
 .otp-head {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.9fr);
-  gap: 0.9rem;
+  grid-template-columns: 1fr;
+  gap: 0.72rem;
   align-items: start;
 }
 
@@ -350,9 +350,11 @@ body::after {
 }
 
 .otp-controls {
-  min-width: min(440px, 100%);
+  min-width: 0;
   display: grid;
-  gap: 0.34rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 0.62rem;
+  row-gap: 0.34rem;
 }
 
 .otp-controls label {
@@ -361,6 +363,16 @@ body::after {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 700;
+}
+
+#enemySupportSearch,
+#enemySupportSelect {
+  grid-column: 1;
+}
+
+#enemyBotSearch,
+#enemyBotSelect {
+  grid-column: 2;
 }
 
 .filter-input {
@@ -1032,6 +1044,14 @@ body.rain-off #matrixRain {
 
   .otp-controls {
     min-width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  #enemySupportSearch,
+  #enemySupportSelect,
+  #enemyBotSearch,
+  #enemyBotSelect {
+    grid-column: 1;
   }
 
   .profile-card,
