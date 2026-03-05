@@ -714,6 +714,69 @@ def karma_matchup_recommendation_from_deeplol(
                 break
         return values[:3]
 
+    def load_general_fallback() -> dict[str, Any]:
+        try:
+            otp_rows = get_karma_otp_rows_from_deeplol(limit=5)
+            benchmark = build_top5_otp_benchmark(
+                otp_rows,
+                version=ddragon_version,
+                item_names=item_names,
+                rune_names=rune_names,
+                rune_icons=rune_icons,
+                spell_names=spell_names,
+                spell_icons=spell_icons,
+            )
+        except Exception as exc:
+            diagnostics.append(
+                {
+                    "endpoint": "matchup_general_fallback",
+                    "status": 0,
+                    "detail": str(exc)[:180],
+                }
+            )
+            return {}
+
+        averages = benchmark.get("averages", {}) if isinstance(benchmark, dict) else {}
+        benchmark_build = benchmark.get("build", {}) if isinstance(benchmark, dict) else {}
+        benchmark_runes = benchmark.get("runes", {}) if isinstance(benchmark, dict) else {}
+        total_games = safe_num((averages or {}).get("totalGames"))
+        benchmark_wr = round(float((averages or {}).get("winRate", 0.0) or 0.0), 1)
+
+        if not benchmark_build or not benchmark_runes:
+            return {}
+        if not benchmark_build.get("coreItemIds") or safe_num(benchmark_runes.get("keystoneId")) <= 0:
+            return {}
+
+        fallback_build = dict(benchmark_build)
+        fallback_build["winRate"] = benchmark_wr
+        fallback_build["games"] = total_games
+
+        fallback_runes = dict(benchmark_runes)
+        fallback_runes["winRate"] = benchmark_wr
+        fallback_runes["games"] = total_games
+
+        return {
+            "source": "deeplol.gg",
+            "region": "KR",
+            "eloFilter": "Top KR Karma OTP Benchmark",
+            "label": "General high-winrate Karma fallback",
+            "dataNote": (
+                "Fallback uses the weighted benchmark across top KR Karma OTP builds "
+                "when no matchup-specific setup clears the threshold."
+            ),
+            "bestBuild": fallback_build,
+            "bestRunes": fallback_runes,
+            "winrateSource": {
+                "name": "General Karma Benchmark",
+                "winRate": benchmark_wr,
+                "games": total_games,
+            },
+            "advice": [
+                "Matchup-specific data did not clear the recommendation floor.",
+                "Use the general high-winrate Karma setup as the default blind-safe option.",
+            ],
+        }
+
     try:
         (
             ddragon_version,
@@ -817,6 +880,37 @@ def karma_matchup_recommendation_from_deeplol(
         deeplol_fetch_error = str(exc)[:180]
 
     if not matchup_rows and not riot_pair_rows:
+        general_fallback = load_general_fallback()
+        if general_fallback:
+            return {
+                "source": general_fallback.get("source", "deeplol.gg"),
+                "region": general_fallback.get("region", "KR"),
+                "eloFilter": general_fallback.get("eloFilter", "Top KR Karma OTP Benchmark"),
+                "dataNote": (
+                    "No matchup-specific rows were available for this botlane. "
+                    f"{general_fallback.get('dataNote', '')}"
+                ).strip(),
+                "champion": "Karma",
+                "selectedEnemySupportId": selected_support,
+                "selectedEnemyBotId": selected_bot,
+                "selectedEnemySupport": champion_names.get(selected_support, "Unknown"),
+                "selectedEnemyBot": champion_names.get(selected_bot, "Unknown"),
+                "championOptions": champion_options,
+                "supportChampionOptions": support_options,
+                "botChampionOptions": bot_options,
+                "sampleMatches": 0,
+                "aggregate": {"wins": 0, "losses": 0, "winRate": 0.0},
+                "winrateSources": [general_fallback.get("winrateSource", {})],
+                "bestBuild": general_fallback.get("bestBuild", {}),
+                "bestRunes": general_fallback.get("bestRunes", {}),
+                "you": {},
+                "comparison": {},
+                "recommendationAvailable": True,
+                "recommendationMode": "general_fallback",
+                "recommendationLabel": general_fallback.get("label", "General high-winrate Karma fallback"),
+                "fallbackReason": "No matchup-specific samples were available for this botlane.",
+                "advice": general_fallback.get("advice", []),
+            }
         return {
             "source": "deeplol.gg + riot.api",
             "region": "KR + Recent",
@@ -1047,6 +1141,51 @@ def karma_matchup_recommendation_from_deeplol(
     extra_in_your_core = [item_id for item_id in your_core_ids if item_id not in build_core_ids]
     advice: list[str] = []
     if not recommendation_available:
+        general_fallback = load_general_fallback()
+        if general_fallback:
+            fallback_sources = [
+                source_row
+                for source_row in winrate_sources
+                if safe_num((source_row or {}).get("games")) > 0
+            ]
+            fallback_source_row = general_fallback.get("winrateSource", {})
+            if safe_num((fallback_source_row or {}).get("games")) > 0:
+                fallback_sources.append(fallback_source_row)
+            return {
+                "source": general_fallback.get("source", source_label),
+                "region": general_fallback.get("region", region_label),
+                "eloFilter": general_fallback.get("eloFilter", elo_label),
+                "dataNote": (
+                    f"{data_note} No matchup-specific build cleared the >{minimum_recommend_win_rate:.0f}% floor. "
+                    f"{general_fallback.get('dataNote', '')}"
+                ).strip(),
+                "champion": "Karma",
+                "selectedEnemySupportId": selected_support,
+                "selectedEnemyBotId": selected_bot,
+                "selectedEnemySupport": champion_names.get(selected_support, "Unknown"),
+                "selectedEnemyBot": champion_names.get(selected_bot, "Unknown"),
+                "championOptions": champion_options,
+                "supportChampionOptions": support_options,
+                "botChampionOptions": bot_options,
+                "sampleMatches": sample_games,
+                "aggregate": {
+                    "wins": wins,
+                    "losses": max(sample_games - wins, 0),
+                    "winRate": sample_win_rate,
+                },
+                "winrateSources": fallback_sources,
+                "bestBuild": general_fallback.get("bestBuild", {}),
+                "bestRunes": general_fallback.get("bestRunes", {}),
+                "you": {},
+                "comparison": {},
+                "recommendationAvailable": True,
+                "recommendationMode": "general_fallback",
+                "recommendationLabel": general_fallback.get("label", "General high-winrate Karma fallback"),
+                "fallbackReason": (
+                    f"Current matchup data stayed below the >{minimum_recommend_win_rate:.0f}% recommendation floor."
+                ),
+                "advice": general_fallback.get("advice", []),
+            }
         return {
             "source": source_label,
             "region": region_label,
@@ -1413,6 +1552,7 @@ def build_top5_otp_benchmark(
             "kda": round(weighted_average(kda_pairs), 2),
             "lp": round(average(lp_values), 0),
             "games": round(average(games_values), 1),
+            "totalGames": int(sum(games_values)),
         },
         "build": {
             "coreItemIds": top_core_ids,

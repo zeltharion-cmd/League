@@ -612,6 +612,49 @@ body::after {
   line-height: 1.45;
 }
 
+.kv-row {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: start;
+}
+
+.kv-label {
+  color: var(--gold-strong);
+  font-weight: 700;
+}
+
+.kv-label::after {
+  content: ":";
+}
+
+.kv-value {
+  min-width: 0;
+  color: var(--ink);
+}
+
+.source-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  align-items: baseline;
+  padding: 0.18rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.source-item:last-child {
+  border-bottom: 0;
+}
+
+.source-item span {
+  color: var(--muted);
+}
+
+.source-item strong {
+  color: var(--ink);
+  white-space: nowrap;
+}
+
 .stack-text strong {
   color: #ffffff;
 }
@@ -1073,6 +1116,17 @@ body.rain-off #matrixRain {
 @media (max-width: 700px) {
   .otp-grid {
     grid-template-columns: 1fr;
+  }
+
+  .kv-row {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+
+  .source-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.12rem;
   }
 
   .runes-layout {

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260228-13">
+  <link rel="stylesheet" href="styles.css?v=20260228-14">
 </head>
 <body>
   <canvas id="matrixRain" aria-hidden="true"></canvas>
@@ -92,18 +92,18 @@
       </div>
       <div class="otp-grid">
         <article class="mini otp-block">
-          <h4>Best Build Vs Current Botlane</h4>
+          <h4 id="matchupBuildTitle">Best Build Vs Current Botlane</h4>
           <div id="enemyPairVisual" class="enemy-pair"></div>
           <div id="matchupBuild" class="stack-text">Loading...</div>
           <div id="matchupBuildIcons" class="icon-row"></div>
           <button id="matchupRunesBtn" type="button" class="rune-btn">Open Matchup Runes</button>
         </article>
         <article class="mini otp-block">
-          <h4>Sample / Filter</h4>
+          <h4 id="matchupMetaTitle">Sample / Filter</h4>
           <div id="matchupMeta" class="stack-text">Loading...</div>
         </article>
         <article class="mini otp-block">
-          <h4>Execution Notes</h4>
+          <h4 id="matchupAdviceTitle">Execution Notes</h4>
           <ul id="matchupAdvice" class="advice-list">
             <li>Loading...</li>
           </ul>
@@ -154,6 +154,6 @@
       </div>
     </div>
   </main>
-  <script src="app.js?v=20260228-13"></script>
+  <script src="app.js?v=20260228-14"></script>
 </body>
 </html>

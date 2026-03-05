@@ -20,6 +20,9 @@ const enemyPairVisualEl = document.getElementById("enemyPairVisual");
 const matchupMetaEl = document.getElementById("matchupMeta");
 const matchupAdviceEl = document.getElementById("matchupAdvice");
 const matchupRunesBtnEl = document.getElementById("matchupRunesBtn");
+const matchupBuildTitleEl = document.getElementById("matchupBuildTitle");
+const matchupMetaTitleEl = document.getElementById("matchupMetaTitle");
+const matchupAdviceTitleEl = document.getElementById("matchupAdviceTitle");
 
 const runesModalEl = document.getElementById("runesModal");
 const closeRunesModalEl = document.getElementById("closeRunesModal");
@@ -152,7 +155,12 @@ function setMatchupStatus(message) {
 }
 
 function line(label, value) {
-  return `<div><strong>${label}:</strong> ${value}</div>`;
+  return (
+    `<div class="kv-row">` +
+    `<strong class="kv-label">${label}</strong>` +
+    `<span class="kv-value">${value}</span>` +
+    `</div>`
+  );
 }
 
 function renderWinrateSources(sources) {
@@ -173,9 +181,9 @@ function renderWinrateSources(sources) {
         .replace("Riot Your Karma (Recent)", "Your Karma Recent");
       const wr = `${safeNum(source?.winRate).toFixed(1)}%`;
       const games = safeNum(source?.games);
-      return `• ${name}: ${wr} (${games}g)`;
+      return `<div class="source-item"><span>${name}</span><strong>${wr} (${games}g)</strong></div>`;
     })
-    .join("<br>");
+    .join("");
 }
 
 function renderIconChip(item) {
@@ -648,8 +656,12 @@ function renderHighEloMatchup(payload) {
   const bestRunes = data.bestRunes || {};
   const aggregate = data.aggregate || {};
   const advice = Array.isArray(data.advice) ? data.advice : [];
+  const recommendationMode = String(data.recommendationMode || "");
 
   if (data.error) {
+    setText(matchupBuildTitleEl, "Matchup Build");
+    setText(matchupMetaTitleEl, "Sample / Filter");
+    setText(matchupAdviceTitleEl, "Execution Notes");
     setHtml(matchupBuildEl, line("Status", data.error) + line("Detail", data.detail || "No detail"));
     setHtml(matchupBuildIconsEl, "");
     setHtml(matchupMetaEl, line("Filter", "Diamond+") + line("Sample", "0 games"));
@@ -660,6 +672,9 @@ function renderHighEloMatchup(payload) {
   }
 
   if (data.recommendationAvailable === false) {
+    setText(matchupBuildTitleEl, "Matchup Build Unavailable");
+    setText(matchupMetaTitleEl, "Sample / Filter");
+    setText(matchupAdviceTitleEl, "Execution Notes");
     setHtml(
       matchupBuildEl,
       line("Enemy Support", data.selectedEnemySupport || "-") +
@@ -691,6 +706,70 @@ function renderHighEloMatchup(payload) {
 
   const matchupCore = Array.isArray(bestBuild.coreItems) ? bestBuild.coreItems.join(" -> ") : "-";
   const matchupSpells = Array.isArray(bestBuild.summonerSpells) ? bestBuild.summonerSpells.join(" + ") : "-";
+  const isGeneralFallback = recommendationMode === "general_fallback";
+
+  if (isGeneralFallback) {
+    setText(matchupBuildTitleEl, "General Karma Fallback");
+    setText(matchupMetaTitleEl, "Fallback / Matchup Context");
+    setText(matchupAdviceTitleEl, "Fallback Notes");
+    setHtml(
+      matchupBuildEl,
+      line("Current Botlane", `${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}`) +
+      line("Recommendation", data.recommendationLabel || "General high-winrate Karma fallback") +
+      line("Reason", data.fallbackReason || "No matchup-specific build cleared the threshold.") +
+      line("Core Build", matchupCore || "-") +
+      line("Boots", bestBuild.boots || "-") +
+      line("Spells", matchupSpells || "-") +
+      line("Keystone", bestRunes.keystone || "-") +
+      line("Primary Tree", bestRunes.primaryStyle || "-") +
+      line("Secondary Tree", bestRunes.secondaryStyle || "-")
+    );
+
+    const fallbackIcons = [
+      ...(Array.isArray(bestBuild.coreItemsDetailed) ? bestBuild.coreItemsDetailed : []),
+      ...(Array.isArray(bestBuild.bootsDetailed) ? bestBuild.bootsDetailed : []),
+      ...(Array.isArray(bestBuild.summonerSpellsDetailed) ? bestBuild.summonerSpellsDetailed : []),
+    ];
+    setHtml(matchupBuildIconsEl, renderIconRow(fallbackIcons));
+
+    setHtml(
+      matchupMetaEl,
+      line("Build Source", `${data.source || "Deeplol"} (${data.region || "KR"})`) +
+      line("Build Basis", data.eloFilter || "Top KR Karma OTP Benchmark") +
+      line("Current Matchup", `${safeNum(data.sampleMatches)} games (${safeNum(aggregate.winRate).toFixed(1)}% WR)`) +
+      line("Fallback WR", `${safeNum(bestBuild.winRate).toFixed(1)}% across ${safeNum(bestBuild.games)} benchmark games`) +
+      line("Cross-Source WR", renderWinrateSources(data.winrateSources)) +
+      line("Data Note", data.dataNote || "")
+    );
+
+    setHtml(
+      matchupAdviceEl,
+      advice.length
+        ? advice.map((entry) => `<li>${entry}</li>`).join("")
+        : "<li>Use the fallback build as the stable default into this botlane.</li>"
+    );
+
+    matchupRunesCache = {
+      primary: [
+        ...(Array.isArray(bestRunes.keystoneDetailed) ? bestRunes.keystoneDetailed : []),
+        ...(Array.isArray(bestRunes.primaryRunesDetailed) ? bestRunes.primaryRunesDetailed : []),
+      ],
+      secondary: Array.isArray(bestRunes.secondaryRunesDetailed) ? bestRunes.secondaryRunesDetailed : [],
+      shards: Array.isArray(bestRunes.statShardsDetailed) ? bestRunes.statShardsDetailed : [],
+    };
+
+    setText(
+      setupHeadlineEl,
+      `Fallback Karma setup vs ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}: ` +
+      `${matchupCore || "-"} (${bestRunes.keystone || "No keystone"}).`
+    );
+    setMatchupStatus("No matchup-specific setup cleared the threshold. Showing a general high-winrate Karma build.");
+    return;
+  }
+
+  setText(matchupBuildTitleEl, "Best Build Vs Current Botlane");
+  setText(matchupMetaTitleEl, "Sample / Filter");
+  setText(matchupAdviceTitleEl, "Execution Notes");
 
   setHtml(
     matchupBuildEl,
