@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260228-15">
+  <link rel="stylesheet" href="styles.css?v=20260228-16">
 </head>
 <body>
   <canvas id="matrixRain" aria-hidden="true"></canvas>
@@ -94,24 +94,44 @@
           </div>
         </div>
       </div>
-      <div class="otp-grid">
-        <article class="mini otp-block">
-          <h4 id="matchupBuildTitle">Best Build Vs Current Botlane</h4>
-          <div id="enemyPairVisual" class="enemy-pair"></div>
-          <div id="matchupBuild" class="stack-text">Loading...</div>
-          <div id="matchupBuildIcons" class="icon-row"></div>
-          <button id="matchupRunesBtn" type="button" class="rune-btn">Open Matchup Runes</button>
-        </article>
-        <article class="mini otp-block">
-          <h4 id="matchupMetaTitle">Sample / Filter</h4>
-          <div id="matchupMeta" class="stack-text">Loading...</div>
-        </article>
-        <article class="mini otp-block">
-          <h4 id="matchupAdviceTitle">Execution Notes</h4>
-          <ul id="matchupAdvice" class="advice-list">
-            <li>Loading...</li>
-          </ul>
-        </article>
+      <div class="matchup-showcase">
+        <section class="matchup-hero">
+          <div class="matchup-hero-main">
+            <div id="matchupChampionPortrait" class="champion-portrait"></div>
+            <div class="matchup-hero-copy">
+              <p class="matchup-kicker">Karma Support Recommendation</p>
+              <h4 id="matchupHeroTitle">Loading matchup build...</h4>
+              <p id="matchupHeroSubtitle" class="matchup-hero-subtitle">Waiting for recommendation data.</p>
+              <div id="matchupHeroIcons" class="hero-icon-strip"></div>
+            </div>
+          </div>
+          <div class="matchup-hero-side">
+            <div id="matchupSourceBadge" class="source-badge">Loading</div>
+            <div id="enemyPairVisual" class="enemy-pair"></div>
+          </div>
+        </section>
+
+        <div id="matchupStatsStrip" class="matchup-stats-strip"></div>
+
+        <div class="otp-grid">
+          <article class="mini otp-block">
+            <div id="matchupBuildIcons" class="icon-row"></div>
+            <h4 id="matchupBuildTitle">Recommended Build</h4>
+            <div id="matchupBuild" class="stack-text">Loading...</div>
+            <button id="matchupRunesBtn" type="button" class="rune-btn">Open Matchup Runes</button>
+          </article>
+          <article class="mini otp-block">
+            <h4 id="matchupMetaTitle">Runes and Summoners</h4>
+            <div id="matchupRunesPreview" class="runes-preview-grid">Loading...</div>
+            <div id="matchupMeta" class="stack-text"></div>
+          </article>
+          <article class="mini otp-block">
+            <h4 id="matchupAdviceTitle">Context and Notes</h4>
+            <ul id="matchupAdvice" class="advice-list">
+              <li>Loading...</li>
+            </ul>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -158,6 +178,6 @@
       </div>
     </div>
   </main>
-  <script src="app.js?v=20260228-15"></script>
+  <script src="app.js?v=20260228-16"></script>
 </body>
 </html>

@@ -23,6 +23,13 @@ const matchupRunesBtnEl = document.getElementById("matchupRunesBtn");
 const matchupBuildTitleEl = document.getElementById("matchupBuildTitle");
 const matchupMetaTitleEl = document.getElementById("matchupMetaTitle");
 const matchupAdviceTitleEl = document.getElementById("matchupAdviceTitle");
+const matchupChampionPortraitEl = document.getElementById("matchupChampionPortrait");
+const matchupHeroTitleEl = document.getElementById("matchupHeroTitle");
+const matchupHeroSubtitleEl = document.getElementById("matchupHeroSubtitle");
+const matchupHeroIconsEl = document.getElementById("matchupHeroIcons");
+const matchupSourceBadgeEl = document.getElementById("matchupSourceBadge");
+const matchupStatsStripEl = document.getElementById("matchupStatsStrip");
+const matchupRunesPreviewEl = document.getElementById("matchupRunesPreview");
 
 const runesModalEl = document.getElementById("runesModal");
 const closeRunesModalEl = document.getElementById("closeRunesModal");
@@ -203,6 +210,97 @@ function renderIconRow(items) {
     return "<div class='stack-text'>No build images available.</div>";
   }
   return items.map((item) => renderIconChip(item)).join("");
+}
+
+function renderCompactIconStrip(items) {
+  if (!Array.isArray(items) || !items.length) {
+    return "";
+  }
+  return items
+    .filter((item) => item?.icon)
+    .map((item) => (
+      `<div class="hero-icon" title="${item.name || ""}">` +
+      `<img src="${item.icon}" alt="${item.name || ""}" loading="lazy">` +
+      `</div>`
+    ))
+    .join("");
+}
+
+function renderPortrait(option, titleText) {
+  if (!matchupChampionPortraitEl) {
+    return;
+  }
+  if (!option?.icon) {
+    setHtml(matchupChampionPortraitEl, `<div class="portrait-fallback">${titleText || "K"}</div>`);
+    return;
+  }
+  setHtml(
+    matchupChampionPortraitEl,
+    `<img src="${option.icon}" alt="${option.name || "Karma"}" loading="lazy">`
+  );
+}
+
+function renderStatsStrip(items) {
+  if (!matchupStatsStripEl) {
+    return;
+  }
+  const safeItems = Array.isArray(items) ? items.filter(Boolean) : [];
+  if (!safeItems.length) {
+    setHtml(matchupStatsStripEl, "");
+    return;
+  }
+  setHtml(
+    matchupStatsStripEl,
+    safeItems
+      .map((item) => (
+        `<article class="metric-tile">` +
+        `<span>${item.label || "-"}</span>` +
+        `<strong>${item.value || "-"}</strong>` +
+        `</article>`
+      ))
+      .join("")
+  );
+}
+
+function renderRunePreview(bestRunes, bestBuild) {
+  if (!matchupRunesPreviewEl) {
+    return;
+  }
+  const keystone = Array.isArray(bestRunes?.keystoneDetailed) ? bestRunes.keystoneDetailed : [];
+  const primary = Array.isArray(bestRunes?.primaryRunesDetailed) ? bestRunes.primaryRunesDetailed : [];
+  const secondary = Array.isArray(bestRunes?.secondaryRunesDetailed) ? bestRunes.secondaryRunesDetailed : [];
+  const shards = Array.isArray(bestRunes?.statShardsDetailed) ? bestRunes.statShardsDetailed : [];
+  const spells = Array.isArray(bestBuild?.summonerSpellsDetailed) ? bestBuild.summonerSpellsDetailed : [];
+
+  const iconRow = (title, entries, round = true) => {
+    const safeEntries = Array.isArray(entries) ? entries.filter((entry) => entry?.icon) : [];
+    if (!safeEntries.length) {
+      return "";
+    }
+    return (
+      `<section class="preview-section">` +
+      `<span>${title}</span>` +
+      `<div class="preview-icons">` +
+      safeEntries
+        .map((entry) => (
+          `<div class="preview-icon${round ? " round" : ""}" title="${entry.name || ""}">` +
+          `<img src="${entry.icon}" alt="${entry.name || ""}" loading="lazy">` +
+          `</div>`
+        ))
+        .join("") +
+      `</div>` +
+      `</section>`
+    );
+  };
+
+  const html =
+    iconRow("Keystone", keystone) +
+    iconRow("Primary", primary) +
+    iconRow("Secondary", secondary) +
+    iconRow("Shards", shards) +
+    iconRow("Spells", spells, false);
+
+  setHtml(matchupRunesPreviewEl, html || "<div class='stack-text'>No rune preview available.</div>");
 }
 
 function runeSection(title, entries) {
@@ -657,8 +755,16 @@ function renderHighEloMatchup(payload) {
   const aggregate = data.aggregate || {};
   const advice = Array.isArray(data.advice) ? data.advice : [];
   const recommendationMode = String(data.recommendationMode || "");
+  const karmaOption = findChampionOptionById(43) || { name: "Karma", icon: "" };
 
   if (data.error) {
+    renderPortrait(karmaOption, "K");
+    setText(matchupHeroTitleEl, "Karma recommendation unavailable");
+    setText(matchupHeroSubtitleEl, data.error || "Unable to load matchup recommendation right now.");
+    setText(matchupSourceBadgeEl, "Unavailable");
+    setHtml(matchupHeroIconsEl, "");
+    renderStatsStrip([]);
+    setHtml(matchupRunesPreviewEl, "<div class='stack-text'>No rune preview available.</div>");
     setText(matchupBuildTitleEl, "Matchup Build");
     setText(matchupMetaTitleEl, "Sample / Filter");
     setText(matchupAdviceTitleEl, "Execution Notes");
@@ -672,6 +778,17 @@ function renderHighEloMatchup(payload) {
   }
 
   if (data.recommendationAvailable === false) {
+    renderPortrait(karmaOption, "K");
+    setText(matchupHeroTitleEl, `No valid setup vs ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}`);
+    setText(matchupHeroSubtitleEl, "No matchup-specific build cleared the minimum win-rate floor.");
+    setText(matchupSourceBadgeEl, data.eloFilter || "No Match");
+    setHtml(matchupHeroIconsEl, "");
+    renderStatsStrip([
+      { label: "Matchup WR", value: `${safeNum(data.aggregate?.winRate).toFixed(1)}%` },
+      { label: "Sample", value: `${safeNum(data.sampleMatches)} games` },
+      { label: "Rule", value: ">50.0% floor" },
+    ]);
+    setHtml(matchupRunesPreviewEl, "<div class='stack-text'>No coherent rune page passed the filter for this botlane.</div>");
     setText(matchupBuildTitleEl, "Matchup Build Unavailable");
     setText(matchupMetaTitleEl, "Sample / Filter");
     setText(matchupAdviceTitleEl, "Execution Notes");
@@ -707,8 +824,26 @@ function renderHighEloMatchup(payload) {
   const matchupCore = Array.isArray(bestBuild.coreItems) ? bestBuild.coreItems.join(" -> ") : "-";
   const matchupSpells = Array.isArray(bestBuild.summonerSpells) ? bestBuild.summonerSpells.join(" + ") : "-";
   const isGeneralFallback = recommendationMode === "general_fallback";
+  const heroIcons = [
+    ...(Array.isArray(bestBuild.coreItemsDetailed) ? bestBuild.coreItemsDetailed.slice(0, 3) : []),
+    ...(Array.isArray(bestBuild.bootsDetailed) ? bestBuild.bootsDetailed.slice(0, 1) : []),
+    ...(Array.isArray(bestBuild.summonerSpellsDetailed) ? bestBuild.summonerSpellsDetailed.slice(0, 2) : []),
+  ];
+
+  renderPortrait(karmaOption, "K");
+  setHtml(matchupHeroIconsEl, renderCompactIconStrip(heroIcons));
+  renderRunePreview(bestRunes, bestBuild);
 
   if (isGeneralFallback) {
+    setText(matchupHeroTitleEl, `Karma fallback vs ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}`);
+    setText(matchupHeroSubtitleEl, data.fallbackReason || "Showing a general high-winrate Karma setup.");
+    setText(matchupSourceBadgeEl, data.eloFilter || "Fallback");
+    renderStatsStrip([
+      { label: "Fallback WR", value: `${safeNum(bestBuild.winRate).toFixed(1)}%` },
+      { label: "Benchmark", value: `${safeNum(bestBuild.games)} games` },
+      { label: "Matchup WR", value: `${safeNum(aggregate.winRate).toFixed(1)}%` },
+      { label: "Botlane", value: `${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}` },
+    ]);
     setText(matchupBuildTitleEl, "General Karma Fallback");
     setText(matchupMetaTitleEl, "Fallback / Matchup Context");
     setText(matchupAdviceTitleEl, "Fallback Notes");
@@ -767,8 +902,20 @@ function renderHighEloMatchup(payload) {
     return;
   }
 
+  setText(matchupHeroTitleEl, `Karma build vs ${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}`);
+  setText(
+    matchupHeroSubtitleEl,
+    `${safeNum(bestBuild.winRate).toFixed(1)}% build WR, ${safeNum(bestRunes.winRate).toFixed(1)}% rune WR, ${safeNum(aggregate.winRate).toFixed(1)}% matchup WR.`
+  );
+  setText(matchupSourceBadgeEl, data.eloFilter || "Diamond+");
+  renderStatsStrip([
+    { label: "Build WR", value: `${safeNum(bestBuild.winRate).toFixed(1)}%` },
+    { label: "Rune WR", value: `${safeNum(bestRunes.winRate).toFixed(1)}%` },
+    { label: "Matchup WR", value: `${safeNum(aggregate.winRate).toFixed(1)}%` },
+    { label: "Sample", value: `${safeNum(data.sampleMatches)} games` },
+  ]);
   setText(matchupBuildTitleEl, "Best Build Vs Current Botlane");
-  setText(matchupMetaTitleEl, "Sample / Filter");
+  setText(matchupMetaTitleEl, "Runes and Matchup Context");
   setText(matchupAdviceTitleEl, "Execution Notes");
 
   setHtml(
