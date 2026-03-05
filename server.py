@@ -810,8 +810,8 @@ def karma_matchup_recommendation_from_deeplol(
         }
 
     champion_options = build_champion_options(champion_names, champion_icons)
-    support_options = filter_champion_options(champion_options, SUPPORT_CHAMPION_IDS)
-    bot_options = filter_champion_options(champion_options, BOT_CARRY_CHAMPION_IDS)
+    support_options = champion_options
+    bot_options = champion_options
     selected_support = safe_num(enemy_support_id)
     selected_bot = safe_num(enemy_bot_id)
     if selected_support <= 0 or selected_support not in champion_names:
@@ -1000,6 +1000,7 @@ def karma_matchup_recommendation_from_deeplol(
     wins = 0
     high_elo_rows = [row for row in matchup_rows if is_diamond_plus(str(row.get("tier", "")))]
     deeplol_model_rows = high_elo_rows if high_elo_rows else matchup_rows
+    recommendation_rows = list(deeplol_model_rows if deeplol_model_rows else riot_pair_rows)
     rows_for_model = list(deeplol_model_rows)
     if riot_pair_rows:
         rows_for_model.extend(riot_pair_rows)
@@ -1007,7 +1008,7 @@ def karma_matchup_recommendation_from_deeplol(
     riot_model_games = len(riot_pair_rows)
     if deeplol_model_games and riot_model_games:
         data_note = (
-            "Combined model: Deeplol DIAMOND+ (closest available to D2+) blended with your Riot recent same-matchup data."
+            "Builds and runes use Deeplol DIAMOND+ rows. Riot recent same-matchup data is shown as extra matchup context."
         )
     elif deeplol_model_games:
         data_note = (
@@ -1023,9 +1024,8 @@ def karma_matchup_recommendation_from_deeplol(
     build_stats: dict[tuple[Any, ...], dict[str, float]] = {}
     rune_stats: dict[tuple[Any, ...], dict[str, float]] = {}
 
-    for row in rows_for_model:
+    for row in recommendation_rows:
         win = safe_num(row.get("win")) == 1
-        wins += 1 if win else 0
         final_items = [safe_num(item_id) for item_id in (row.get("item_final", []) or []) if safe_num(item_id) > 0]
         matchup_core = row_core_items(row, boot_ids=boot_ids, trinket_ids=trinket_ids)
         matchup_boots = next((item_id for item_id in final_items if item_id in boot_ids), 0)
@@ -1058,14 +1058,19 @@ def karma_matchup_recommendation_from_deeplol(
         rune_stats[rune_key]["games"] += 1
         rune_stats[rune_key]["wins"] += 1 if win else 0
 
+    for row in rows_for_model:
+        win = safe_num(row.get("win")) == 1
+        wins += 1 if win else 0
+
     sample_games = len(rows_for_model)
     sample_win_rate = round((wins * 100 / sample_games), 1) if sample_games else 0.0
+    recommendation_games = len(recommendation_rows)
     deeplol_wins = sum(1 for row in deeplol_model_rows if safe_num(row.get("win")) == 1)
     deeplol_sample_wr = round((deeplol_wins * 100 / deeplol_model_games), 1) if deeplol_model_games else 0.0
     riot_wins = sum(1 for row in riot_pair_rows if safe_num(row.get("win")) == 1)
     riot_sample_wr = round((riot_wins * 100 / riot_model_games), 1) if riot_model_games else 0.0
-    selected_build_key, build_wr, build_games = choose_best_setup(build_stats, sample_count=sample_games)
-    selected_rune_key, rune_wr, rune_games = choose_best_setup(rune_stats, sample_count=sample_games)
+    selected_build_key, build_wr, build_games = choose_best_setup(build_stats, sample_count=recommendation_games)
+    selected_rune_key, rune_wr, rune_games = choose_best_setup(rune_stats, sample_count=recommendation_games)
     personal_wr = round((karma_wins * 100 / karma_games), 1) if karma_games else 0.0
     winrate_sources = [
         {
@@ -1079,7 +1084,7 @@ def karma_matchup_recommendation_from_deeplol(
             "games": riot_model_games,
         },
         {
-            "name": "Combined Matchup Model",
+            "name": "Current Matchup Context",
             "winRate": sample_win_rate,
             "games": sample_games,
         },
