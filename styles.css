@@ -569,6 +569,27 @@ select {
   gap: 8px;
 }
 
+.load-more-btn {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(232, 232, 226, 0.74));
+  color: #090909;
+  font-weight: 800;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.load-more-btn:hover {
+  border-color: #000;
+}
+
+.load-more-btn:disabled {
+  opacity: 0.58;
+  cursor: wait;
+}
+
 .match-card {
   display: grid;
   grid-template-columns: 6px 54px minmax(124px, 1.1fr) minmax(105px, 0.8fr) repeat(4, minmax(76px, 0.72fr));

@@ -20,6 +20,7 @@ LOCKED_GAME_NAME = "feelsbanman"
 LOCKED_TAG_LINE = "EUW"
 KARMA_CHAMPION_ID = 43
 DISPLAY_MATCH_COUNT_FIXED = 5
+DISPLAY_MATCH_COUNT_MAX = 30
 KARMA_SETUP_MATCH_COUNT = 15
 MATCHUP_SETUP_MATCH_COUNT = 60
 MATCHUP_PAGE_SIZE = 10
@@ -2589,7 +2590,11 @@ class LoLTrackerHandler(SimpleHTTPRequestHandler):
                 {"error": "Unsupported platform. Example: na1, euw1, kr, oc1."},
             )
 
-        matches = DISPLAY_MATCH_COUNT_FIXED
+        requested_matches = safe_num(query.get("matches", [str(DISPLAY_MATCH_COUNT_FIXED)])[0])
+        matches = min(
+            DISPLAY_MATCH_COUNT_MAX,
+            max(DISPLAY_MATCH_COUNT_FIXED, requested_matches or DISPLAY_MATCH_COUNT_FIXED),
+        )
         cache_key = "|".join(
             [
                 game_name.lower(),

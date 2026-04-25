@@ -65,6 +65,7 @@ const supportControlMetricEl = document.getElementById("supportControlMetric");
 const supportKpMetricEl = document.getElementById("supportKpMetric");
 const supportUtilityMetricEl = document.getElementById("supportUtilityMetric");
 const matchesBodyEl = document.getElementById("matchesBody");
+const loadMoreMatchesBtnEl = document.getElementById("loadMoreMatchesBtn");
 const matrixRainCanvasEl = document.getElementById("matrixRain");
 const pageQueryParams = new URLSearchParams(window.location.search);
 const includeTimelineMode =
@@ -140,6 +141,10 @@ let supportOptionsAll = [];
 let botOptionsAll = [];
 let matchupRunesCache = {};
 let matrixRainController = null;
+let currentMatchLimit = 5;
+
+const MATCH_LIMIT_STEP = 5;
+const MATCH_LIMIT_MAX = 30;
 
 function safeNum(value) {
   const n = Number(value);
@@ -785,6 +790,15 @@ function renderDashboard(payload) {
     );
   }
 
+  if (loadMoreMatchesBtnEl) {
+    const reachedEnd = matches.length < currentMatchLimit || matches.length >= MATCH_LIMIT_MAX;
+    loadMoreMatchesBtnEl.hidden = reachedEnd;
+    loadMoreMatchesBtnEl.disabled = false;
+    loadMoreMatchesBtnEl.textContent = reachedEnd
+      ? "All available matches loaded"
+      : `Load more matches (${matches.length}/${MATCH_LIMIT_MAX})`;
+  }
+
   if (dashboardEl) {
     dashboardEl.classList.remove("hidden");
   }
@@ -1086,6 +1100,7 @@ async function fetchStats() {
   query.set("game_name", gameNameInputEl?.value?.trim() || "feelsbanman");
   query.set("tag_line", tagLineInputEl?.value?.trim() || "EUW");
   query.set("platform", regionSelectEl?.value || "euw1");
+  query.set("matches", String(currentMatchLimit));
   if (includeTimelineMode) {
     query.set("timeline", "1");
   }
@@ -1125,6 +1140,9 @@ async function refreshStats() {
   if (enemyBotSelectEl) {
     enemyBotSelectEl.disabled = true;
   }
+  if (loadMoreMatchesBtnEl) {
+    loadMoreMatchesBtnEl.disabled = true;
+  }
 
   const gameName = gameNameInputEl?.value?.trim() || "feelsbanman";
   const tagLine = tagLineInputEl?.value?.trim() || "EUW";
@@ -1145,7 +1163,7 @@ async function refreshStats() {
     const support = payload.karmaMatchup?.selectedEnemySupport || "-";
     const bot = payload.karmaMatchup?.selectedEnemyBot || "-";
     setStatus(
-      `Loaded latest 5 ${platform} matches for ${gameName}#${tagLine}. High-winrate matchup model loaded for ${support} + ${bot}.`
+      `Loaded latest ${payload.recentMatches?.length || currentMatchLimit} ${platform} matches for ${gameName}#${tagLine}. High-winrate matchup model loaded for ${support} + ${bot}.`
     );
   } catch (error) {
     if (dashboardEl) {
@@ -1157,6 +1175,9 @@ async function refreshStats() {
   } finally {
     if (searchBtnEl) {
       searchBtnEl.disabled = false;
+    }
+    if (loadMoreMatchesBtnEl) {
+      loadMoreMatchesBtnEl.disabled = false;
     }
   }
 }
@@ -1210,8 +1231,16 @@ if (runesModalEl) {
 if (searchFormEl) {
   searchFormEl.addEventListener("submit", async (event) => {
     event.preventDefault();
+    currentMatchLimit = MATCH_LIMIT_STEP;
     selectedEnemySupportId = 0;
     selectedEnemyBotId = 0;
+    await refreshStats();
+  });
+}
+
+if (loadMoreMatchesBtnEl) {
+  loadMoreMatchesBtnEl.addEventListener("click", async () => {
+    currentMatchLimit = Math.min(MATCH_LIMIT_MAX, currentMatchLimit + MATCH_LIMIT_STEP);
     await refreshStats();
   });
 }
