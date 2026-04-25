@@ -693,6 +693,15 @@ select {
   margin-top: 8px;
 }
 
+.placeholder-panel {
+  margin-top: 8px;
+}
+
+.placeholder-panel h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+}
+
 .otp-head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(420px, 0.78fr);

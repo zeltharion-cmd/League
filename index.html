@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260425-opgg-1">
+  <link rel="stylesheet" href="styles.css?v=20260425-interactions-1">
 </head>
 <body>
   <canvas id="matrixRain" aria-hidden="true"></canvas>
@@ -19,11 +19,11 @@
         <span>Karma.GG</span>
       </a>
       <nav class="main-nav" aria-label="Primary">
-        <a class="active" href="#">League of Legends</a>
-        <a href="#">Champions</a>
-        <a href="#">Game Mode</a>
-        <a href="#">Stats</a>
-        <a href="#">Leaderboards</a>
+        <a class="active" href="#summary" data-tab="summary">League of Legends</a>
+        <a href="#champions" data-tab="champions">Champions</a>
+        <a href="#mastery" data-tab="mastery">Game Mode</a>
+        <a href="#summary" data-tab="summary">Stats</a>
+        <a href="#mastery" data-tab="mastery">Leaderboards</a>
       </nav>
       <button id="customizeBtn" type="button" class="ghost-btn">Customize</button>
     </div>
@@ -61,7 +61,7 @@
         <p id="setupHeadline" class="setup-headline">Loading best matchup recommendation...</p>
       </div>
       <div class="hero-actions">
-        <button type="button" class="secondary-btn">Tier Graph</button>
+        <button id="tierGraphBtn" type="button" class="secondary-btn">Tier Graph</button>
         <button type="submit" form="searchForm" class="primary-btn">Refresh</button>
       </div>
     </section>
@@ -69,9 +69,9 @@
     <nav class="profile-tabs" aria-label="Profile sections">
       <a class="active" href="#summary" data-tab="summary">Summary</a>
       <a href="#champions" data-tab="champions">Champions</a>
-      <a href="#">Mastery</a>
-      <a href="#">Live Game</a>
-      <a href="#">Teamfight Tactics</a>
+      <a href="#mastery" data-tab="mastery">Mastery</a>
+      <a href="#live" data-tab="live">Live Game</a>
+      <a href="#tft" data-tab="tft">Teamfight Tactics</a>
     </nav>
 
     <section id="dashboard" class="layout tab-panel hidden" data-tab-panel="summary">
@@ -207,6 +207,24 @@
       </div>
     </section>
 
+    <section class="card placeholder-panel tab-panel" data-tab-panel="mastery" hidden>
+      <div class="card-title">Mastery</div>
+      <h2>Champion mastery data is queued up next</h2>
+      <p class="status">This tab is active. The tracker currently focuses on match history and Karma matchup analysis.</p>
+    </section>
+
+    <section class="card placeholder-panel tab-panel" data-tab-panel="live" hidden>
+      <div class="card-title">Live Game</div>
+      <h2>No live game loaded</h2>
+      <p class="status">This tab is active. Live game lookup can be added when you want that workflow.</p>
+    </section>
+
+    <section class="card placeholder-panel tab-panel" data-tab-panel="tft" hidden>
+      <div class="card-title">Teamfight Tactics</div>
+      <h2>TFT stats are separate from this Karma tracker</h2>
+      <p class="status">This tab is active. It is intentionally separated from the League match-history view.</p>
+    </section>
+
     <div id="runesModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="runesTitle">
       <div class="modal-card">
         <div class="modal-head">
@@ -250,6 +268,6 @@
       </div>
     </div>
   </main>
-  <script src="app.js?v=20260425-opgg-1"></script>
+  <script src="app.js?v=20260425-interactions-1"></script>
 </body>
 </html>

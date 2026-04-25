@@ -4,6 +4,7 @@ const statusTextEl = document.getElementById("statusText");
 const dashboardEl = document.getElementById("dashboard");
 const championAnalysisPanelEl = document.getElementById("championAnalysisPanel");
 const profileTabEls = Array.from(document.querySelectorAll("[data-tab]"));
+const tabPanelEls = Array.from(document.querySelectorAll("[data-tab-panel]"));
 const matchupStatusEl = document.getElementById("matchupStatus");
 const setupHeadlineEl = document.getElementById("setupHeadline");
 
@@ -68,6 +69,7 @@ const supportKpMetricEl = document.getElementById("supportKpMetric");
 const supportUtilityMetricEl = document.getElementById("supportUtilityMetric");
 const matchesBodyEl = document.getElementById("matchesBody");
 const loadMoreMatchesBtnEl = document.getElementById("loadMoreMatchesBtn");
+const tierGraphBtnEl = document.getElementById("tierGraphBtn");
 const matrixRainCanvasEl = document.getElementById("matrixRain");
 const pageQueryParams = new URLSearchParams(window.location.search);
 const includeTimelineMode =
@@ -179,7 +181,8 @@ function setMatchupStatus(message) {
 }
 
 function setActiveProfileTab(tabName) {
-  activeProfileTab = tabName === "champions" ? "champions" : "summary";
+  const panelExists = tabPanelEls.some((panelEl) => panelEl.dataset.tabPanel === tabName);
+  activeProfileTab = panelExists ? tabName : "summary";
 
   for (const tabEl of profileTabEls) {
     const isActive = tabEl.dataset.tab === activeProfileTab;
@@ -187,11 +190,9 @@ function setActiveProfileTab(tabName) {
     tabEl.setAttribute("aria-selected", isActive ? "true" : "false");
   }
 
-  if (dashboardEl) {
-    dashboardEl.hidden = activeProfileTab !== "summary" || !dashboardHasData;
-  }
-  if (championAnalysisPanelEl) {
-    championAnalysisPanelEl.hidden = activeProfileTab !== "champions";
+  for (const panelEl of tabPanelEls) {
+    const isActive = panelEl.dataset.tabPanel === activeProfileTab;
+    panelEl.hidden = !isActive || (activeProfileTab === "summary" && !dashboardHasData);
   }
 }
 
@@ -384,7 +385,11 @@ function applyRainEnabled(enabled) {
   if (matrixRainController) {
     matrixRainController.setEnabled(enabled);
   }
-  localStorage.setItem(RAIN_STORAGE_KEY, enabled ? "1" : "0");
+  try {
+    localStorage.setItem(RAIN_STORAGE_KEY, enabled ? "1" : "0");
+  } catch {
+    // Storage can be blocked in some browser modes; controls should still work.
+  }
 }
 
 function createMatrixRainController() {
@@ -534,7 +539,11 @@ function syncThemeInputsFromVars(values) {
 }
 
 function saveThemeVars(values) {
-  localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(values));
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(values));
+  } catch {
+    // Storage is optional; applying the theme immediately is the important part.
+  }
 }
 
 function loadSavedThemeVars() {
@@ -586,7 +595,12 @@ function initThemeControls() {
   }
   syncThemeInputsFromVars(readCurrentThemeVars());
 
-  const rainSaved = localStorage.getItem(RAIN_STORAGE_KEY);
+  let rainSaved = null;
+  try {
+    rainSaved = localStorage.getItem(RAIN_STORAGE_KEY);
+  } catch {
+    rainSaved = null;
+  }
   applyRainEnabled(rainSaved === "1");
 
   customizeBtnEl.addEventListener("click", (event) => {
@@ -824,7 +838,7 @@ function renderDashboard(payload) {
   if (dashboardEl) {
     dashboardHasData = true;
     dashboardEl.classList.remove("hidden");
-    dashboardEl.hidden = activeProfileTab !== "summary";
+    setActiveProfileTab(activeProfileTab);
   }
 }
 
@@ -1271,6 +1285,13 @@ if (loadMoreMatchesBtnEl) {
   });
 }
 
+if (tierGraphBtnEl) {
+  tierGraphBtnEl.addEventListener("click", () => {
+    setActiveProfileTab("summary");
+    setStatus("Tier Graph uses the Summary performance cards and match history for now.");
+  });
+}
+
 for (const tabEl of profileTabEls) {
   tabEl.addEventListener("click", (event) => {
     event.preventDefault();
@@ -1279,10 +1300,15 @@ for (const tabEl of profileTabEls) {
 }
 
 function boot() {
-  matrixRainController = createMatrixRainController();
-  initThemeControls();
-  setActiveProfileTab("summary");
-  void refreshStats();
+  try {
+    matrixRainController = createMatrixRainController();
+    initThemeControls();
+    setActiveProfileTab("summary");
+    void refreshStats();
+  } catch (error) {
+    setStatus(error?.message || "The page failed to initialize. Refresh and try again.");
+    setActiveProfileTab("summary");
+  }
 }
 
 if (document.readyState === "loading") {
