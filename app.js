@@ -2,6 +2,8 @@ const searchFormEl = document.getElementById("searchForm");
 const searchBtnEl = document.getElementById("searchBtn");
 const statusTextEl = document.getElementById("statusText");
 const dashboardEl = document.getElementById("dashboard");
+const championAnalysisPanelEl = document.getElementById("championAnalysisPanel");
+const profileTabEls = Array.from(document.querySelectorAll("[data-tab]"));
 const matchupStatusEl = document.getElementById("matchupStatus");
 const setupHeadlineEl = document.getElementById("setupHeadline");
 
@@ -142,6 +144,8 @@ let botOptionsAll = [];
 let matchupRunesCache = {};
 let matrixRainController = null;
 let currentMatchLimit = 5;
+let activeProfileTab = "summary";
+let dashboardHasData = false;
 
 const MATCH_LIMIT_STEP = 5;
 const MATCH_LIMIT_MAX = 30;
@@ -171,6 +175,23 @@ function setStatus(message) {
 
 function setMatchupStatus(message) {
   setText(matchupStatusEl, message);
+}
+
+function setActiveProfileTab(tabName) {
+  activeProfileTab = tabName === "champions" ? "champions" : "summary";
+
+  for (const tabEl of profileTabEls) {
+    const isActive = tabEl.dataset.tab === activeProfileTab;
+    tabEl.classList.toggle("active", isActive);
+    tabEl.setAttribute("aria-selected", isActive ? "true" : "false");
+  }
+
+  if (dashboardEl) {
+    dashboardEl.hidden = activeProfileTab !== "summary" || !dashboardHasData;
+  }
+  if (championAnalysisPanelEl) {
+    championAnalysisPanelEl.hidden = activeProfileTab !== "champions";
+  }
 }
 
 function line(label, value) {
@@ -800,7 +821,9 @@ function renderDashboard(payload) {
   }
 
   if (dashboardEl) {
+    dashboardHasData = true;
     dashboardEl.classList.remove("hidden");
+    dashboardEl.hidden = activeProfileTab !== "summary";
   }
 }
 
@@ -1167,7 +1190,9 @@ async function refreshStats() {
     );
   } catch (error) {
     if (dashboardEl) {
+      dashboardHasData = false;
       dashboardEl.classList.add("hidden");
+      dashboardEl.hidden = true;
     }
     setStatus(error.message || "Failed to load stats.");
     setMatchupStatus("Matchup model unavailable.");
@@ -1245,9 +1270,17 @@ if (loadMoreMatchesBtnEl) {
   });
 }
 
+for (const tabEl of profileTabEls) {
+  tabEl.addEventListener("click", (event) => {
+    event.preventDefault();
+    setActiveProfileTab(tabEl.dataset.tab);
+  });
+}
+
 function boot() {
   matrixRainController = createMatrixRainController();
   initThemeControls();
+  setActiveProfileTab("summary");
   void refreshStats();
 }
 

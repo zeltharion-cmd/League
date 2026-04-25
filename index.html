@@ -67,14 +67,14 @@
     </section>
 
     <nav class="profile-tabs" aria-label="Profile sections">
-      <a class="active" href="#">Summary</a>
-      <a href="#">Champions</a>
+      <a class="active" href="#summary" data-tab="summary">Summary</a>
+      <a href="#champions" data-tab="champions">Champions</a>
       <a href="#">Mastery</a>
       <a href="#">Live Game</a>
       <a href="#">Teamfight Tactics</a>
     </nav>
 
-    <section id="dashboard" class="layout hidden">
+    <section id="dashboard" class="layout tab-panel hidden" data-tab-panel="summary">
       <aside class="sidebar">
         <section class="card rank-card">
           <div class="card-title">Ranked Solo/Duo</div>
@@ -145,7 +145,7 @@
       </section>
     </section>
 
-    <section class="card otp-card">
+    <section id="championAnalysisPanel" class="card otp-card tab-panel" data-tab-panel="champions" hidden>
       <div class="otp-head">
         <div>
           <div class="card-title">Champion Analysis</div>

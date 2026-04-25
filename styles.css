@@ -30,6 +30,10 @@
   display: none !important;
 }
 
+.tab-panel[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   min-height: 100%;
@@ -386,6 +390,10 @@ select {
 .profile-tabs a.active {
   color: #000;
   border-bottom-color: #000;
+}
+
+.profile-tabs a:not([data-tab]) {
+  opacity: 0.46;
 }
 
 .layout {
