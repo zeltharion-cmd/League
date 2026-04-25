@@ -143,12 +143,13 @@ let supportOptionsAll = [];
 let botOptionsAll = [];
 let matchupRunesCache = {};
 let matrixRainController = null;
-let currentMatchLimit = 5;
+let currentMatchLimit = 15;
 let activeProfileTab = "summary";
 let dashboardHasData = false;
 
-const MATCH_LIMIT_STEP = 5;
-const MATCH_LIMIT_MAX = 30;
+const MATCH_LIMIT_INITIAL = 15;
+const MATCH_LIMIT_STEP = 10;
+const MATCH_LIMIT_MAX = 50;
 
 function safeNum(value) {
   const n = Number(value);
@@ -1256,7 +1257,7 @@ if (runesModalEl) {
 if (searchFormEl) {
   searchFormEl.addEventListener("submit", async (event) => {
     event.preventDefault();
-    currentMatchLimit = MATCH_LIMIT_STEP;
+    currentMatchLimit = MATCH_LIMIT_INITIAL;
     selectedEnemySupportId = 0;
     selectedEnemyBotId = 0;
     await refreshStats();
