@@ -85,7 +85,11 @@ const THEME_INPUT_IDS = {
 
 const PRESET_THEMES = [
   {
-    name: "Monochrome",
+    name: "Ethereal",
+    vars: { "--bg-0": "#f7f7f4", "--bg-1": "#ededeb", "--panel": "#ffffff", "--panel-soft": "#f8f8f6", "--ink": "#080808", "--muted": "#6f6f68", "--gold": "#151515", "--gold-strong": "#000000", "--accent": "#ffffff" },
+  },
+  {
+    name: "Obsidian",
     vars: { "--bg-0": "#000000", "--bg-1": "#060606", "--panel": "#090909", "--panel-soft": "#111111", "--ink": "#f8fcff", "--muted": "#cad5e2", "--gold": "#e7eef8", "--gold-strong": "#ffffff", "--accent": "#e9f4ff" },
   },
   {
@@ -126,7 +130,7 @@ const PRESET_THEMES = [
   },
 ];
 
-const THEME_STORAGE_KEY = "kk_theme_vars_v3";
+const THEME_STORAGE_KEY = "kk_theme_vars_v4";
 const RAIN_STORAGE_KEY = "kk_rain";
 
 let selectedEnemySupportId = 0;
@@ -648,6 +652,30 @@ function findChampionOptionById(championId) {
   return null;
 }
 
+function findChampionOptionInPayload(payload, championId) {
+  const targetId = safeNum(championId);
+  const matchup = payload?.karmaMatchup || {};
+  const pools = [
+    matchup.championOptions,
+    matchup.supportChampionOptions,
+    matchup.botChampionOptions,
+    championOptionsAll,
+    supportOptionsAll,
+    botOptionsAll,
+  ];
+
+  for (const pool of pools) {
+    if (!Array.isArray(pool)) {
+      continue;
+    }
+    const found = pool.find((option) => safeNum(option.id) === targetId);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 function renderEnemyPair(data) {
   if (!enemyPairVisualEl) {
     return;
@@ -728,11 +756,17 @@ function renderDashboard(payload) {
         const win = match.result === "Win";
         const role = String(match.role || "UNKNOWN").replace("UTILITY", "SUPPORT");
         const kda = `${safeNum(match.kills)} / ${safeNum(match.deaths)} / ${safeNum(match.assists)}`;
+        const championOption = findChampionOptionInPayload(payload, match.championId);
+        const championName = championOption?.name || match.champion || "Unknown";
+        const championImage = championOption?.icon
+          ? `<img class="match-champion-img" src="${championOption.icon}" alt="${championName}" loading="lazy">`
+          : `<span class="match-champion-fallback">${String(championName).charAt(0) || "?"}</span>`;
         return (
           `<article class="match-card ${win ? "win" : "loss"}">` +
           `<div class="match-result-bar"></div>` +
+          `<div class="match-champion">${championImage}</div>` +
           `<div class="match-main">` +
-          `<strong>${match.champion || "Unknown"}</strong>` +
+          `<strong>${championName}</strong>` +
           `<span>${role} - ${safeNum(match.durationMin).toFixed(1)}m</span>` +
           `<span class="match-result">${win ? "Victory" : "Defeat"}</span>` +
           `</div>` +
