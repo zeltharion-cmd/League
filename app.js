@@ -61,6 +61,9 @@ const gamesMetricEl = document.getElementById("gamesMetric");
 const winRateMetricEl = document.getElementById("winRateMetric");
 const kdaMetricEl = document.getElementById("kdaMetric");
 const csMetricEl = document.getElementById("csMetric");
+const rankEmblemEl = document.getElementById("rankEmblem");
+const rankTitleEl = document.getElementById("rankTitle");
+const rankSubtitleEl = document.getElementById("rankSubtitle");
 const supportRoleMetricEl = document.getElementById("supportRoleMetric");
 const supportRateMetricEl = document.getElementById("supportRateMetric");
 const supportVisionMetricEl = document.getElementById("supportVisionMetric");
@@ -91,51 +94,31 @@ const THEME_INPUT_IDS = {
 const PRESET_THEMES = [
   {
     name: "Ethereal",
-    vars: { "--bg-0": "#f7f7f4", "--bg-1": "#ededeb", "--panel": "#ffffff", "--panel-soft": "#f8f8f6", "--ink": "#080808", "--muted": "#6f6f68", "--gold": "#151515", "--gold-strong": "#000000", "--accent": "#ffffff" },
+    vars: { "--bg-0": "#f7f7f4", "--bg-1": "#ededed", "--panel": "#ffffff", "--panel-soft": "#f8f8f6", "--ink": "#080808", "--muted": "#686861", "--gold": "#151515", "--gold-strong": "#000000", "--accent": "#ffffff" },
   },
   {
     name: "Obsidian",
-    vars: { "--bg-0": "#000000", "--bg-1": "#060606", "--panel": "#090909", "--panel-soft": "#111111", "--ink": "#f8fcff", "--muted": "#cad5e2", "--gold": "#e7eef8", "--gold-strong": "#ffffff", "--accent": "#e9f4ff" },
+    vars: { "--bg-0": "#050505", "--bg-1": "#101010", "--panel": "#0d0d0d", "--panel-soft": "#171717", "--ink": "#f7f7f2", "--muted": "#b8b8b0", "--gold": "#f1f1ea", "--gold-strong": "#ffffff", "--accent": "#2b2b2b" },
   },
   {
-    name: "Arc Light",
-    vars: { "--bg-0": "#0b0f1b", "--bg-1": "#1d2946", "--panel": "#1d2e54", "--panel-soft": "#2d4374", "--ink": "#e7f4ff", "--muted": "#9dc4df", "--gold": "#7fb8ff", "--gold-strong": "#b3dbff", "--accent": "#53d2ff" },
+    name: "Porcelain",
+    vars: { "--bg-0": "#f5f3ef", "--bg-1": "#e7e3da", "--panel": "#fffdf8", "--panel-soft": "#eee9df", "--ink": "#171511", "--muted": "#786f62", "--gold": "#2c2923", "--gold-strong": "#090807", "--accent": "#ffffff" },
   },
   {
-    name: "Infernal",
-    vars: { "--bg-0": "#150806", "--bg-1": "#2d1109", "--panel": "#32150f", "--panel-soft": "#4b2417", "--ink": "#ffe7d1", "--muted": "#d8b49e", "--gold": "#ff8a47", "--gold-strong": "#ffc08d", "--accent": "#ff5d3a" },
+    name: "Moonlit",
+    vars: { "--bg-0": "#eceff2", "--bg-1": "#d9dde2", "--panel": "#fbfcfd", "--panel-soft": "#eef1f4", "--ink": "#0b0d10", "--muted": "#687079", "--gold": "#1d2228", "--gold-strong": "#000000", "--accent": "#ffffff" },
   },
   {
-    name: "Elderwood",
-    vars: { "--bg-0": "#06130e", "--bg-1": "#123024", "--panel": "#173a2d", "--panel-soft": "#20523f", "--ink": "#e9f8ec", "--muted": "#9fcab4", "--gold": "#88c26b", "--gold-strong": "#bee9a2", "--accent": "#57d390" },
+    name: "Ink",
+    vars: { "--bg-0": "#e9e7e1", "--bg-1": "#d5d2ca", "--panel": "#f9f8f4", "--panel-soft": "#eeeae2", "--ink": "#070707", "--muted": "#5d5a54", "--gold": "#111111", "--gold-strong": "#000000", "--accent": "#c8c4ba" },
   },
   {
-    name: "Void",
-    vars: { "--bg-0": "#0b0616", "--bg-1": "#1f1036", "--panel": "#251645", "--panel-soft": "#372365", "--ink": "#f1e8ff", "--muted": "#b7a8d6", "--gold": "#a178ff", "--gold-strong": "#c8acff", "--accent": "#8c5bff" },
-  },
-  {
-    name: "Hextech",
-    vars: { "--bg-0": "#061014", "--bg-1": "#0d2833", "--panel": "#113745", "--panel-soft": "#1a495a", "--ink": "#e9f8ff", "--muted": "#9fc2cf", "--gold": "#31b5d0", "--gold-strong": "#88e2f5", "--accent": "#4ce6ff" },
-  },
-  {
-    name: "Nightfall",
-    vars: { "--bg-0": "#0f1014", "--bg-1": "#191d2a", "--panel": "#20283a", "--panel-soft": "#2a344c", "--ink": "#eff2fa", "--muted": "#a4afc3", "--gold": "#9aa6bf", "--gold-strong": "#d7deef", "--accent": "#7f92bf" },
-  },
-  {
-    name: "Bilgewater",
-    vars: { "--bg-0": "#071015", "--bg-1": "#13222b", "--panel": "#1a3039", "--panel-soft": "#25444f", "--ink": "#eaf7f4", "--muted": "#a7c8bf", "--gold": "#61bca0", "--gold-strong": "#9de5cc", "--accent": "#3fd6b2" },
-  },
-  {
-    name: "Sandstorm",
-    vars: { "--bg-0": "#151006", "--bg-1": "#2b1f0d", "--panel": "#3a2b15", "--panel-soft": "#594323", "--ink": "#fff1d5", "--muted": "#ddc59b", "--gold": "#d2a757", "--gold-strong": "#f4d499", "--accent": "#f0bf6a" },
-  },
-  {
-    name: "Neon Matrix",
-    vars: { "--bg-0": "#030d09", "--bg-1": "#0b2217", "--panel": "#0d2f20", "--panel-soft": "#114430", "--ink": "#d8ffe8", "--muted": "#8ed6b0", "--gold": "#3fe28f", "--gold-strong": "#88ffc0", "--accent": "#27f2a4" },
+    name: "Frost",
+    vars: { "--bg-0": "#f2f6f7", "--bg-1": "#dfe8ea", "--panel": "#ffffff", "--panel-soft": "#edf4f5", "--ink": "#071012", "--muted": "#607174", "--gold": "#102022", "--gold-strong": "#000000", "--accent": "#ffffff" },
   },
 ];
 
-const THEME_STORAGE_KEY = "kk_theme_vars_v4";
+const THEME_STORAGE_KEY = "kk_theme_vars_v6";
 const RAIN_STORAGE_KEY = "kk_rain";
 
 let selectedEnemySupportId = 0;
@@ -194,6 +177,28 @@ function setActiveProfileTab(tabName) {
     const isActive = panelEl.dataset.tabPanel === activeProfileTab;
     panelEl.hidden = !isActive || (activeProfileTab === "summary" && !dashboardHasData);
   }
+}
+
+function formatRankTitle(rankedSolo) {
+  if (!rankedSolo || !rankedSolo.tier) {
+    return "Unranked";
+  }
+  const tier = String(rankedSolo.tier || "").toUpperCase();
+  const division = String(rankedSolo.rank || "").toUpperCase();
+  const tierName = tier.charAt(0) + tier.slice(1).toLowerCase();
+  return ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(tier)
+    ? tierName
+    : `${tierName} ${division || ""}`.trim();
+}
+
+function rankInitial(rankedSolo) {
+  const tier = String(rankedSolo?.tier || "").trim();
+  return tier ? tier.charAt(0).toUpperCase() : "-";
+}
+
+function rankTierClass(rankedSolo) {
+  const tier = String(rankedSolo?.tier || "unranked").toLowerCase();
+  return `rank-tier-${tier || "unranked"}`;
 }
 
 function line(label, value) {
@@ -751,6 +756,7 @@ function renderMatchupFilters() {
 
 function renderDashboard(payload) {
   const player = payload.player || {};
+  const rankedSolo = player.rankedSolo || {};
   const aggregate = payload.aggregate || {};
   const support = payload.supportInsights || {};
   const matches = Array.isArray(payload.recentMatches) ? payload.recentMatches : [];
@@ -762,6 +768,7 @@ function renderDashboard(payload) {
   if (profileIconImageEl && profileIconFallbackEl) {
     if (ddragonVersion && profileIconId > 0) {
       profileIconImageEl.src = `https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/profileicon/${profileIconId}.png`;
+      profileIconImageEl.alt = `${player.gameName || "Player"} profile icon`;
       profileIconImageEl.hidden = false;
       profileIconFallbackEl.hidden = true;
     } else {
@@ -772,8 +779,20 @@ function renderDashboard(payload) {
   setHtml(
     profileMetaEl,
     `<div>${String(regionSelectEl?.value || "euw1").toUpperCase()}</div>` +
-    `<div>Ladder rank: <strong>Personal tracker</strong></div>` +
-    `<div>Profile icon: <strong>${profileIconId || "-"}</strong></div>`
+    `<div>Rank: <strong>${formatRankTitle(rankedSolo)}</strong></div>` +
+    `<div>Level: <strong>${safeNum(player.summonerLevel) || "-"}</strong></div>`
+  );
+
+  setText(rankEmblemEl, rankInitial(rankedSolo));
+  if (rankEmblemEl) {
+    rankEmblemEl.className = `rank-emblem ${rankTierClass(rankedSolo)}`;
+  }
+  setText(rankTitleEl, formatRankTitle(rankedSolo));
+  setText(
+    rankSubtitleEl,
+    rankedSolo?.tier
+      ? `${safeNum(rankedSolo.leaguePoints)} LP - ${safeNum(rankedSolo.wins)}W ${safeNum(rankedSolo.losses)}L`
+      : "Ranked Solo/Duo"
   );
 
   setText(gamesMetricEl, safeNum(aggregate.games));

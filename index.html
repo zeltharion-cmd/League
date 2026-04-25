@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260425-interactions-1">
+  <link rel="stylesheet" href="styles.css?v=20260425-profile-rank-1">
 </head>
 <body>
   <canvas id="matrixRain" aria-hidden="true"></canvas>
@@ -79,10 +79,10 @@
         <section class="card rank-card">
           <div class="card-title">Ranked Solo/Duo</div>
           <div class="rank-block">
-            <div class="rank-emblem">D</div>
+            <div id="rankEmblem" class="rank-emblem">-</div>
             <div>
-              <strong>Karma Support</strong>
-              <span id="supportRoleMetric">-</span>
+              <strong id="rankTitle">Unranked</strong>
+              <span id="rankSubtitle">Ranked Solo/Duo</span>
             </div>
           </div>
           <div class="rank-line">
@@ -100,6 +100,10 @@
           <div class="rank-line">
             <span>Avg CS</span>
             <strong id="csMetric">-</strong>
+          </div>
+          <div class="rank-line">
+            <span>Primary Role</span>
+            <strong id="supportRoleMetric">-</strong>
           </div>
         </section>
 
@@ -256,9 +260,9 @@
             <label>Panel Soft<input id="color-panel-soft" type="color"></label>
             <label>Text<input id="color-ink" type="color"></label>
             <label>Muted Text<input id="color-muted" type="color"></label>
-            <label>Blue<input id="color-gold" type="color"></label>
-            <label>Blue Strong<input id="color-gold-strong" type="color"></label>
-            <label>Accent<input id="color-accent" type="color"></label>
+            <label>Primary<input id="color-gold" type="color"></label>
+            <label>Primary Strong<input id="color-gold-strong" type="color"></label>
+            <label>Highlight<input id="color-accent" type="color"></label>
           </div>
           <div class="customize-actions">
             <button id="applyThemeBtn" type="button" class="rune-btn">Apply</button>
@@ -268,6 +272,6 @@
       </div>
     </div>
   </main>
-  <script src="app.js?v=20260425-interactions-1"></script>
+  <script src="app.js?v=20260425-profile-rank-1"></script>
 </body>
 </html>

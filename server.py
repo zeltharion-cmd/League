@@ -1978,6 +1978,42 @@ def player_summary(
         )
         raise primary_error
 
+    ranked_entries = optional_riot_get_json(
+        f"https://{platform}.api.riotgames.com/lol/league/v4/entries/by-summoner/{summoner.get('id', '')}",
+        api_key,
+        "league_entries",
+        fallback=[],
+        diagnostics=diagnostics,
+    )
+    if not isinstance(ranked_entries, list):
+        ranked_entries = []
+
+    def ranked_entry(queue_type: str) -> dict[str, Any]:
+        entry = next(
+            (
+                row for row in ranked_entries
+                if str(row.get("queueType", "")).upper() == queue_type
+            ),
+            {},
+        )
+        if not isinstance(entry, dict) or not entry:
+            return {}
+        return {
+            "queueType": entry.get("queueType"),
+            "tier": entry.get("tier"),
+            "rank": entry.get("rank"),
+            "leaguePoints": safe_num(entry.get("leaguePoints")),
+            "wins": safe_num(entry.get("wins")),
+            "losses": safe_num(entry.get("losses")),
+            "veteran": bool(entry.get("veteran")),
+            "inactive": bool(entry.get("inactive")),
+            "freshBlood": bool(entry.get("freshBlood")),
+            "hotStreak": bool(entry.get("hotStreak")),
+        }
+
+    ranked_solo = ranked_entry("RANKED_SOLO_5x5")
+    ranked_flex = ranked_entry("RANKED_FLEX_SR")
+
     match_ids_count = max(match_count, KARMA_SETUP_MATCH_COUNT)
     match_ids_url = (
         f"https://{routing}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids"
@@ -2489,6 +2525,8 @@ def player_summary(
             "tagLine": account.get("tagLine"),
             "profileIconId": summoner.get("profileIconId"),
             "summonerLevel": summoner.get("summonerLevel"),
+            "rankedSolo": ranked_solo,
+            "rankedFlex": ranked_flex,
             "puuid": puuid,
         },
         "recentMatches": recent_matches,
