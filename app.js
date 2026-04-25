@@ -230,7 +230,13 @@ function renderWinrateSources(sources) {
         .replace("General Karma OTP Build", "General Karma OTP Build");
       const wr = `${safeNum(source?.winRate).toFixed(1)}%`;
       const games = safeNum(source?.games);
-      return `<div class="source-item"><span>${name}</span><strong>${wr} (${games}g)</strong></div>`;
+      return (
+        `<article class="source-card">` +
+        `<span>${name}</span>` +
+        `<strong>${wr}</strong>` +
+        `<small>${games} games</small>` +
+        `</article>`
+      );
     })
     .join("");
 }
@@ -321,12 +327,18 @@ function renderRunePreview(bestRunes, bestBuild) {
     }
     return (
       `<section class="preview-section">` +
+      `<div class="preview-section-head">` +
       `<span>${title}</span>` +
+      `<strong>${safeEntries.length}</strong>` +
+      `</div>` +
       `<div class="preview-icons">` +
       safeEntries
         .map((entry) => (
-          `<div class="preview-icon${round ? " round" : ""}" title="${entry.name || ""}">` +
+          `<div class="preview-icon-card" title="${entry.name || ""}">` +
+          `<div class="preview-icon${round ? " round" : ""}">` +
           `<img src="${entry.icon}" alt="${entry.name || ""}" loading="lazy">` +
+          `</div>` +
+          `<span>${entry.name || ""}</span>` +
           `</div>`
         ))
         .join("") +
@@ -971,7 +983,7 @@ function renderHighEloMatchup(payload) {
       { label: "Botlane", value: `${data.selectedEnemySupport || "-"} + ${data.selectedEnemyBot || "-"}` },
     ]);
     setText(matchupBuildTitleEl, "General Karma Fallback");
-    setText(matchupMetaTitleEl, "Fallback / Matchup Context");
+    setText(matchupMetaTitleEl, "Karma Player Comparison");
     setText(matchupAdviceTitleEl, "Fallback Notes");
     setHtml(
       matchupBuildEl,
@@ -1041,7 +1053,7 @@ function renderHighEloMatchup(payload) {
     { label: "Sample", value: `${safeNum(data.sampleMatches)} games` },
   ]);
   setText(matchupBuildTitleEl, "Best Build Vs Current Botlane");
-  setText(matchupMetaTitleEl, "Runes and Matchup Context");
+  setText(matchupMetaTitleEl, "Karma Player Comparison");
   setText(matchupAdviceTitleEl, "Execution Notes");
 
   setHtml(
