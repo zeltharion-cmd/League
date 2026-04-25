@@ -51,6 +51,9 @@ const matchupBodyEl = document.getElementById("matchupBody");
 
 const playerHeadingEl = document.getElementById("playerHeading");
 const profileMetaEl = document.getElementById("profileMeta");
+const profileIconImageEl = document.getElementById("profileIconImage");
+const profileIconFallbackEl = document.getElementById("profileIconFallback");
+const profileLevelBadgeEl = document.getElementById("profileLevelBadge");
 const gamesMetricEl = document.getElementById("gamesMetric");
 const winRateMetricEl = document.getElementById("winRateMetric");
 const kdaMetricEl = document.getElementById("kdaMetric");
@@ -185,7 +188,9 @@ function renderWinrateSources(sources) {
         .replace("Deeplol Matchup (Diamond+)", "Deeplol Diamond+ Matchup")
         .replace("Riot Same Matchup (Recent)", "Riot Same Matchup")
         .replace("Combined Matchup Model", "Combined Model")
-        .replace("Riot Your Karma (Recent)", "Your Karma Recent");
+        .replace("Riot Your Karma (Recent)", "Your Karma Recent")
+        .replace("General Karma Benchmark", "General Karma OTP Build")
+        .replace("General Karma OTP Build", "General Karma OTP Build");
       const wr = `${safeNum(source?.winRate).toFixed(1)}%`;
       const games = safeNum(source?.games);
       return `<div class="source-item"><span>${name}</span><strong>${wr} (${games}g)</strong></div>`;
@@ -551,7 +556,7 @@ function initThemeControls() {
   syncThemeInputsFromVars(readCurrentThemeVars());
 
   const rainSaved = localStorage.getItem(RAIN_STORAGE_KEY);
-  applyRainEnabled(rainSaved !== "0");
+  applyRainEnabled(rainSaved === "1");
 
   customizeBtnEl.addEventListener("click", (event) => {
     event.preventDefault();
@@ -680,13 +685,26 @@ function renderDashboard(payload) {
   const aggregate = payload.aggregate || {};
   const support = payload.supportInsights || {};
   const matches = Array.isArray(payload.recentMatches) ? payload.recentMatches : [];
+  const ddragonVersion = payload.ddragonVersion || "";
+  const profileIconId = safeNum(player.profileIconId);
 
   setText(playerHeadingEl, `${player.gameName || "feelsbanman"} #${player.tagLine || "EUW"}`);
+  setText(profileLevelBadgeEl, safeNum(player.summonerLevel) || "-");
+  if (profileIconImageEl && profileIconFallbackEl) {
+    if (ddragonVersion && profileIconId > 0) {
+      profileIconImageEl.src = `https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/profileicon/${profileIconId}.png`;
+      profileIconImageEl.hidden = false;
+      profileIconFallbackEl.hidden = true;
+    } else {
+      profileIconImageEl.hidden = true;
+      profileIconFallbackEl.hidden = false;
+    }
+  }
   setHtml(
     profileMetaEl,
-    `<div>Region: <strong>${String(regionSelectEl?.value || "euw1").toUpperCase()}</strong></div>` +
-    `<div>Summoner Level: <strong>${safeNum(player.summonerLevel)}</strong></div>` +
-    `<div>Profile Icon ID: <strong>${safeNum(player.profileIconId)}</strong></div>`
+    `<div>${String(regionSelectEl?.value || "euw1").toUpperCase()}</div>` +
+    `<div>Ladder rank: <strong>Personal tracker</strong></div>` +
+    `<div>Profile icon: <strong>${profileIconId || "-"}</strong></div>`
   );
 
   setText(gamesMetricEl, safeNum(aggregate.games));
@@ -701,7 +719,7 @@ function renderDashboard(payload) {
   setText(supportUtilityMetricEl, safeNum(support.avgAllyUtility).toLocaleString());
 
   if (!matches.length) {
-    setHtml(matchesBodyEl, `<tr><td colspan="12">No recent matches found.</td></tr>`);
+    setHtml(matchesBodyEl, `<div class="empty-row">No recent matches found.</div>`);
   } else {
     setHtml(
       matchesBodyEl,
@@ -709,21 +727,24 @@ function renderDashboard(payload) {
       .map((match) => {
         const win = match.result === "Win";
         const role = String(match.role || "UNKNOWN").replace("UTILITY", "SUPPORT");
+        const kda = `${safeNum(match.kills)} / ${safeNum(match.deaths)} / ${safeNum(match.assists)}`;
         return (
-          "<tr>" +
-          `<td>${match.champion || "Unknown"}</td>` +
-          `<td>${role}</td>` +
-          `<td><span class="pill ${win ? "win" : "loss"}">${win ? "Win" : "Loss"}</span></td>` +
-          `<td>${safeNum(match.kills)} / ${safeNum(match.deaths)} / ${safeNum(match.assists)}</td>` +
-          `<td>${safeNum(match.killParticipation).toFixed(1)}%</td>` +
-          `<td>${safeNum(match.visionScore)}</td>` +
-          `<td>${safeNum(match.controlWards)}</td>` +
-          `<td>${safeNum(match.wardsCleared)}</td>` +
-          `<td>${safeNum(match.allyUtility).toLocaleString()}</td>` +
-          `<td>${safeNum(match.cs)}</td>` +
-          `<td>${safeNum(match.gold).toLocaleString()}</td>` +
-          `<td>${safeNum(match.durationMin).toFixed(1)}m</td>` +
-          "</tr>"
+          `<article class="match-card ${win ? "win" : "loss"}">` +
+          `<div class="match-result-bar"></div>` +
+          `<div class="match-main">` +
+          `<strong>${match.champion || "Unknown"}</strong>` +
+          `<span>${role} - ${safeNum(match.durationMin).toFixed(1)}m</span>` +
+          `<span class="match-result">${win ? "Victory" : "Defeat"}</span>` +
+          `</div>` +
+          `<div class="match-stat match-kda">` +
+          `<strong>${kda}</strong>` +
+          `<span>KDA ${safeNum(match.killParticipation).toFixed(1)}% KP</span>` +
+          `</div>` +
+          `<div class="match-stat optional"><strong>${safeNum(match.cs)}</strong><span>CS</span></div>` +
+          `<div class="match-stat optional"><strong>${safeNum(match.visionScore)}</strong><span>Vision</span></div>` +
+          `<div class="match-stat optional"><strong>${safeNum(match.controlWards)}</strong><span>Control</span></div>` +
+          `<div class="match-stat optional"><strong>${safeNum(match.gold).toLocaleString()}</strong><span>Gold</span></div>` +
+          `</article>`
         );
       })
       .join("")
@@ -870,9 +891,9 @@ function renderHighEloMatchup(payload) {
     setHtml(
       matchupMetaEl,
       line("Build Source", `${data.source || "Deeplol"} (${data.region || "KR"})`) +
-      line("Build Basis", data.eloFilter || "Top KR Karma OTP Benchmark") +
+      line("Build Basis", data.eloFilter || "Top KR Karma OTP Build") +
       line("Current Matchup", `${safeNum(data.sampleMatches)} games (${safeNum(aggregate.winRate).toFixed(1)}% WR)`) +
-      line("Fallback WR", `${safeNum(bestBuild.winRate).toFixed(1)}% across ${safeNum(bestBuild.games)} benchmark games`) +
+      line("Fallback WR", `${safeNum(bestBuild.winRate).toFixed(1)}% across ${safeNum(bestBuild.games)} OTP games`) +
       line("Cross-Source WR", renderWinrateSources(data.winrateSources)) +
       line("Data Note", data.dataNote || "")
     );

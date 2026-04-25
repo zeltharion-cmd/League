@@ -717,15 +717,6 @@ def karma_matchup_recommendation_from_deeplol(
     def load_general_fallback() -> dict[str, Any]:
         try:
             otp_rows = get_karma_otp_rows_from_deeplol(limit=5)
-            benchmark = build_top5_otp_benchmark(
-                otp_rows,
-                version=ddragon_version,
-                item_names=item_names,
-                rune_names=rune_names,
-                rune_icons=rune_icons,
-                spell_names=spell_names,
-                spell_icons=spell_icons,
-            )
         except Exception as exc:
             diagnostics.append(
                 {
@@ -736,44 +727,77 @@ def karma_matchup_recommendation_from_deeplol(
             )
             return {}
 
-        averages = benchmark.get("averages", {}) if isinstance(benchmark, dict) else {}
-        benchmark_build = benchmark.get("build", {}) if isinstance(benchmark, dict) else {}
-        benchmark_runes = benchmark.get("runes", {}) if isinstance(benchmark, dict) else {}
-        total_games = safe_num((averages or {}).get("totalGames"))
-        benchmark_wr = round(float((averages or {}).get("winRate", 0.0) or 0.0), 1)
-
-        if not benchmark_build or not benchmark_runes:
-            return {}
-        if not benchmark_build.get("coreItemIds") or safe_num(benchmark_runes.get("keystoneId")) <= 0:
+        if not otp_rows:
             return {}
 
-        fallback_build = dict(benchmark_build)
-        fallback_build["winRate"] = benchmark_wr
-        fallback_build["games"] = total_games
+        ranked_rows = sorted(
+            [row for row in otp_rows if isinstance(row, dict)],
+            key=lambda row: (
+                float(row.get("win_rate", 0.0) or 0.0),
+                safe_num(row.get("games")),
+                -safe_num(row.get("rank")),
+            ),
+            reverse=True,
+        )
 
-        fallback_runes = dict(benchmark_runes)
-        fallback_runes["winRate"] = benchmark_wr
-        fallback_runes["games"] = total_games
+        exact_setup = {}
+        for row in ranked_rows:
+            puu_id = str(row.get("puu_id", "")).strip()
+            if not puu_id:
+                continue
+            try:
+                otp_build = get_otp_build_from_deeplol(puu_id)
+                exact_setup = build_exact_deeplol_setup(
+                    otp_row=row,
+                    otp_build=otp_build,
+                    version=ddragon_version,
+                    item_names=item_names,
+                    rune_names=rune_names,
+                    rune_icons=rune_icons,
+                    spell_names=spell_names,
+                    spell_icons=spell_icons,
+                )
+            except Exception as exc:
+                diagnostics.append(
+                    {
+                        "endpoint": "matchup_general_fallback_exact",
+                        "status": 0,
+                        "detail": str(exc)[:180],
+                    }
+                )
+                continue
+            if exact_setup.get("build", {}).get("coreItemIds") and safe_num(exact_setup.get("runes", {}).get("keystoneId")) > 0:
+                break
+            exact_setup = {}
+
+        if not exact_setup:
+            return {}
+
+        profile = exact_setup.get("profile", {})
+        fallback_build = exact_setup.get("build", {})
+        fallback_runes = exact_setup.get("runes", {})
+        build_wr = round(float(fallback_build.get("winRate", 0.0) or 0.0), 1)
+        build_games = safe_num(fallback_build.get("games"))
 
         return {
             "source": "deeplol.gg",
             "region": "KR",
-            "eloFilter": "Top KR Karma OTP Benchmark",
+            "eloFilter": "Top KR Karma OTP Build",
             "label": "General high-winrate Karma fallback",
             "dataNote": (
-                "Fallback uses the weighted benchmark across top KR Karma OTP builds "
-                "when no matchup-specific setup clears the threshold."
+                f"Fallback uses one exact KR Karma OTP page ({profile.get('riotId', 'Unknown OTP')}) "
+                "so the build, runes, and summoners stay coherent when matchup-specific data does not clear the threshold."
             ),
             "bestBuild": fallback_build,
             "bestRunes": fallback_runes,
             "winrateSource": {
-                "name": "General Karma Benchmark",
-                "winRate": benchmark_wr,
-                "games": total_games,
+                "name": "General Karma OTP Build",
+                "winRate": build_wr,
+                "games": build_games,
             },
             "advice": [
                 "Matchup-specific data did not clear the recommendation floor.",
-                "Use the general high-winrate Karma setup as the default blind-safe option.",
+                f"Use this exact OTP setup from {profile.get('riotId', 'the selected KR Karma OTP')} as the blind-safe fallback.",
             ],
         }
 
@@ -1420,6 +1444,84 @@ def best_deeplol_combo(items: list[dict[str, Any]]) -> list[int]:
     if not isinstance(values, list):
         return []
     return [safe_num(v) for v in values if safe_num(v) > 0]
+
+
+def build_exact_deeplol_setup(
+    *,
+    otp_row: dict[str, Any],
+    otp_build: dict[str, Any],
+    version: str,
+    item_names: dict[int, str],
+    rune_names: dict[int, str],
+    rune_icons: dict[int, str],
+    spell_names: dict[int, str],
+    spell_icons: dict[int, str],
+) -> dict[str, Any]:
+    otp_rune = otp_build.get("rune", {}) if isinstance(otp_build.get("rune"), dict) else {}
+    otp_rune_main = [safe_num(v) for v in (otp_rune.get("rune_main", []) or []) if safe_num(v) > 0]
+    otp_rune_sub = [safe_num(v) for v in (otp_rune.get("rune_sub", []) or []) if safe_num(v) > 0]
+    otp_rune_stat = [safe_num(v) for v in (otp_rune.get("rune_stat", []) or []) if safe_num(v) > 0]
+
+    otp_boots = safe_num((otp_build.get("boots", [{}]) or [{}])[0].get("boots", 0))
+    otp_spells = (otp_build.get("spell", [{}]) or [{}])[0].get("spell", [])
+    otp_spell_ids = [safe_num(v) for v in otp_spells if safe_num(v) > 0]
+
+    otp_core = best_deeplol_combo(otp_build.get("item_build_3", []))
+    if len(otp_core) < 3:
+        otp_core = best_deeplol_combo(otp_build.get("item_build_2", []))
+    if not otp_core and safe_num(otp_build.get("core_item")) > 0:
+        otp_core = [safe_num(otp_build.get("core_item"))]
+
+    otp_primary_style = otp_rune_main[0] if len(otp_rune_main) > 0 else 0
+    otp_keystone = otp_rune_main[1] if len(otp_rune_main) > 1 else 0
+    otp_secondary_style = otp_rune_sub[0] if len(otp_rune_sub) > 0 else 0
+    build_wr = round(float(otp_row.get("win_rate", 0.0) or 0.0) * 100, 1)
+    build_games = safe_num(otp_row.get("games"))
+
+    return {
+        "profile": {
+            "riotId": f"{otp_row.get('riot_id_name', 'Unknown')}#{otp_row.get('riot_id_tag_line', '?')}",
+            "rank": safe_num(otp_row.get("rank")),
+            "tier": otp_row.get("tier"),
+            "lp": safe_num(otp_row.get("lp")),
+            "games": build_games,
+            "winRate": build_wr,
+            "kda": round(float(otp_row.get("kda", 0.0) or 0.0), 2),
+        },
+        "build": {
+            "coreItemIds": otp_core,
+            "coreItems": ids_to_names(otp_core, item_names, "Item"),
+            "coreItemsDetailed": build_item_details(otp_core, item_names, version),
+            "bootsId": otp_boots,
+            "boots": id_name(otp_boots, item_names, "Item"),
+            "bootsDetailed": build_item_details([otp_boots], item_names, version),
+            "summonerSpellIds": otp_spell_ids,
+            "summonerSpells": ids_to_names(otp_spell_ids, spell_names, "Spell"),
+            "summonerSpellsDetailed": build_spell_details(otp_spell_ids, spell_names, spell_icons),
+            "winRate": build_wr,
+            "games": build_games,
+        },
+        "runes": {
+            "primaryStyleId": otp_primary_style,
+            "primaryStyle": id_name(otp_primary_style, rune_names, "Rune"),
+            "keystoneId": otp_keystone,
+            "keystone": id_name(otp_keystone, rune_names, "Rune"),
+            "keystoneDetailed": build_rune_details([otp_keystone], rune_names, rune_icons),
+            "primaryRuneIds": otp_rune_main[1:],
+            "primaryRunes": ids_to_names(otp_rune_main[1:], rune_names, "Rune"),
+            "primaryRunesDetailed": build_rune_details(otp_rune_main[1:], rune_names, rune_icons),
+            "secondaryStyleId": otp_secondary_style,
+            "secondaryStyle": id_name(otp_secondary_style, rune_names, "Rune"),
+            "secondaryRuneIds": otp_rune_sub[1:],
+            "secondaryRunes": ids_to_names(otp_rune_sub[1:], rune_names, "Rune"),
+            "secondaryRunesDetailed": build_rune_details(otp_rune_sub[1:], rune_names, rune_icons),
+            "statShardIds": otp_rune_stat,
+            "statShards": ids_to_names(otp_rune_stat, rune_names, "Rune"),
+            "statShardsDetailed": build_rune_details(otp_rune_stat, rune_names, rune_icons),
+            "winRate": build_wr,
+            "games": build_games,
+        },
+    }
 
 
 def average(values: list[float]) -> float:
